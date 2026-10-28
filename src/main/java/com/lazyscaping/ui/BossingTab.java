@@ -32,6 +32,8 @@ class BossingTab extends JPanel
 		setupView = new GearSetupView(GearTarget.BOSS, actions, icons);
 
 		groupBox.addItem(ALL_BOSSES);
+		// sized by the shortest entry, so the longer group names don't widen the panel
+		groupBox.setPrototypeDisplayValue(ALL_BOSSES);
 		groupBox.setToolTipText("Narrow the boss list to one kind of boss");
 		groupBox.addActionListener(e ->
 		{

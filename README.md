@@ -22,7 +22,7 @@ The side panel has three tabs.
 
 **Show setup in bank.** Every gear setup can open a temporary *lazyscaping* bank tag with its items, laid out with the worn gear on top and the inventory as it's packed. If your bank is closed, it opens next time you open it.
 
-**Your house and diaries.** In the plugin's settings, tick what your house has: a fairy ring, spirit tree, mounted Xeric's talisman or digsite pendant, the jewellery in your jewellery box (ring of dueling, games necklace) and your portals. Gear setups then take a house teleport instead of the teleports these replace, freeing inventory space. A fairy ring or spirit tree replaces a boss's teleport when it gets you there (a fairy ring only once it needs no dramen staff, or the setup carries one anyway). Once you've done the elite Lumbridge & Draynor Diary (detected in game, or tick *Elite Lumbridge Diary*), fairy ring routes no longer pack a dramen staff.
+**Your house and diaries.** In the plugin's settings, tick what your house has: a fairy ring, spirit tree, mounted teleports (Xeric's talisman, digsite pendant, amulet of glory, mythical cape), each teleport in your jewellery box, and every portal in your portal chamber or nexus. Gear setups then take a house teleport instead of the teleports these replace, freeing inventory space. A fairy ring or spirit tree replaces a boss's teleport when it gets you there (a fairy ring only once it needs no dramen staff, or the setup carries one anyway). Once you've done the elite Lumbridge & Draynor Diary (detected in game, or tick *Elite Lumbridge Diary*), fairy ring routes no longer pack a dramen staff.
 
 **Budgets.** Each tab has a budget: a preset, an amount like `25m`, *Unlimited*, or *My coins* (the coins in your bank and inventory).
 

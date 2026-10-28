@@ -45,8 +45,14 @@ final class Components
 	/** An item slot in a grid: a sprite plus a 1px border each side. */
 	private static final Dimension CELL_SIZE = new Dimension(ICON_SIZE.width + 2, ICON_SIZE.height + 2);
 	private static final int GRID_GAP = 3;
-	/** Width of the labels in front of pickers, so the pickers line up. */
+	/** Width of the labels in front of pickers and facts, so they line up. */
 	private static final int PICKER_LABEL_WIDTH = 44;
+	/** Width that a fact's value wraps at, beside its label. */
+	private static final int FACT_WIDTH = TEXT_WIDTH - (PICKER_LABEL_WIDTH + 4) * 3 / 4;
+	/** The line and gap down the left of an {@link #entry}. */
+	private static final int ENTRY_INSET = 8;
+	/** Width that text in an {@link #entry} wraps at. */
+	static final int ENTRY_WIDTH = TEXT_WIDTH - ENTRY_INSET * 3 / 4;
 
 	private Components()
 	{
@@ -55,16 +61,42 @@ final class Components
 	/** A dropdown or other control with a short label in front of it. */
 	static JComponent labeledRow(String label, JComponent control)
 	{
-		JLabel name = new JLabel(label);
-		name.setFont(FontManager.getRunescapeSmallFont());
-		name.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
-		name.setPreferredSize(new Dimension(PICKER_LABEL_WIDTH, name.getPreferredSize().height));
-
 		JPanel row = new JPanel(new BorderLayout(4, 0));
 		row.setOpaque(false);
-		row.add(name, BorderLayout.WEST);
+		row.add(rowLabel(label, ColorScheme.LIGHT_GRAY_COLOR), BorderLayout.WEST);
 		row.add(control, BorderLayout.CENTER);
 		return fullWidth(row);
+	}
+
+	/** A short muted label with a value beside it, which wraps under itself rather than under the label. */
+	static JComponent fact(String label, String html)
+	{
+		JPanel row = new JPanel(new BorderLayout(4, 0));
+		row.setOpaque(false);
+		JLabel name = rowLabel(label, Html.MUTED);
+		name.setVerticalAlignment(SwingConstants.TOP);
+		row.add(name, BorderLayout.WEST);
+		row.add(label(html, FACT_WIDTH), BorderLayout.CENTER);
+		return spaced(row, 3);
+	}
+
+	private static JLabel rowLabel(String text, Color color)
+	{
+		JLabel label = new JLabel(text);
+		label.setFont(FontManager.getRunescapeSmallFont());
+		label.setForeground(color);
+		label.setPreferredSize(new Dimension(PICKER_LABEL_WIDTH, label.getPreferredSize().height));
+		return label;
+	}
+
+	/** One entry of a list, set off by a line down its left side. */
+	static JPanel entry()
+	{
+		JPanel entry = column();
+		entry.setBorder(BorderFactory.createCompoundBorder(
+			BorderFactory.createCompoundBorder(new EmptyBorder(6, 0, 0, 0), BorderFactory.createMatteBorder(0, 2, 0, 0, ColorScheme.MEDIUM_GRAY_COLOR)),
+			new EmptyBorder(0, ENTRY_INSET - 2, 0, 0)));
+		return entry;
 	}
 
 	/** A slot of an item grid, outlined in {@code border}, or blank when {@code border} is null. */

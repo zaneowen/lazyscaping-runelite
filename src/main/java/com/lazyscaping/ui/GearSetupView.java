@@ -102,15 +102,20 @@ class GearSetupView
 		budget.setVisible(!setup.isIronman());
 
 		setupPanel.removeAll();
-		setupPanel.add(Components.spaced(Components.label(Html.muted(Html.parts(gearSource(setup)))), 6));
+		setupPanel.add(Components.gap(4));
+		if (!styleRow.isVisible())
+		{
+			setupPanel.add(Components.fact("Style", Html.escape(setup.getStyle())));
+		}
+		setupPanel.add(Components.fact("Gear", gearSource(setup)));
 		if (setup.getNoGear() != null)
 		{
-			setupPanel.add(Components.spaced(Components.label(Html.escape(setup.getNoGear())), 4));
+			setupPanel.add(Components.spaced(Components.label(Html.escape(setup.getNoGear())), 6));
 		}
 		else
 		{
 			addSummary(setup);
-			setupPanel.add(Components.gap(6));
+			setupPanel.add(Components.gap(8));
 			setupPanel.add(Components.fullWidth(bankButton));
 			setupPanel.add(bankMessage);
 
@@ -129,32 +134,31 @@ class GearSetupView
 
 	private void addSummary(GearSetup setup)
 	{
-		if (setup.isSuppliesOverBudget())
-		{
-			setupPanel.add(Components.spaced(Components.label(Html.color(Html.RED, "Supplies cost more than your budget, so no gear was bought.")), 4));
-		}
 		if (setup.getGearCost() > 0)
 		{
-			String of = setup.getBudget() != null ? " " + Html.keep("of " + Format.gp(setup.getBudget())) : "";
-			setupPanel.add(Components.spaced(Components.label(Html.keep("Buying upgrades:") + " "
-				+ Html.color(Html.GOLD, Html.keep(Format.gp(setup.getGearCost()))) + of), 4));
+			String of = setup.getBudget() != null ? " " + Html.muted(Html.keep("of " + Format.gp(setup.getBudget()))) : "";
+			setupPanel.add(Components.fact("Buying", Html.color(Html.GOLD, Html.keep(Format.gp(setup.getGearCost()))) + of));
 		}
-		setupPanel.add(Components.spaced(Components.label(emptySlotsSummary(setup)), 4));
+		setupPanel.add(Components.fact("Slots", emptySlotsSummary(setup)));
+		if (setup.isSuppliesOverBudget())
+		{
+			setupPanel.add(Components.spaced(Components.label(Html.color(Html.RED, "Supplies cost more than your budget, so no gear was bought.")), 6));
+		}
 	}
 
-	/** The style and where the gear comes from, as short parts that wrap between each other. */
-	private static String[] gearSource(GearSetup setup)
+	/** Where the gear comes from. */
+	private static String gearSource(GearSetup setup)
 	{
 		if (setup.isIronman())
 		{
-			return new String[]{setup.getStyle(), "from the gear you own", "ironmen can't buy"};
+			return "What you own " + Html.muted("(ironmen can't buy)");
 		}
 		if (setup.getBudget() != null && setup.getBudget() == 0)
 		{
-			return new String[]{setup.getStyle(), "from the gear you own"};
+			return "What you own";
 		}
-		String extra = setup.getBudget() == null ? "plus any upgrades" : "plus up to " + Format.gp(setup.getBudget());
-		return new String[]{setup.getStyle(), "from your gear", extra};
+		String extra = setup.getBudget() == null ? "any upgrades" : Html.keep("up to " + Format.gp(setup.getBudget()));
+		return "What you own, plus " + extra;
 	}
 
 	/** What filling the slots that are still empty would cost on the GE. */
@@ -181,15 +185,15 @@ class GearSetupView
 
 		if (empty == 0)
 		{
-			return Html.color(Html.GREEN, "Every slot is filled.");
+			return Html.color(Html.GREEN, "All filled");
 		}
-		String slots = Html.keep("Still empty: " + empty + (empty == 1 ? " slot," : " slots,"));
+		String slots = Html.keep(empty + " empty");
 		if (empty == untradeable)
 		{
-			return slots + " " + Html.keep(untradeable == 1 ? "needing an untradeable item" : "needing untradeable items");
+			return slots + Html.muted(", " + Html.keep(untradeable == 1 ? "needs an untradeable" : "need untradeables"));
 		}
-		return slots + " " + Html.color(Html.GOLD, Html.keep(Format.gp(cost))) + Html.keep(" to fill")
-			+ (untradeable > 0 ? " " + Html.keep("(+ " + untradeable + " untradeable)") : "");
+		return slots + Html.muted(",") + " " + Html.color(Html.GOLD, Html.keep(Format.gp(cost))) + " " + Html.keep("to fill")
+			+ (untradeable > 0 ? " " + Html.muted(Html.keep("(+" + untradeable + " untradeable)")) : "");
 	}
 
 	private static List<GearSlot> allSlots(GearSetup setup)
@@ -241,7 +245,7 @@ class GearSetupView
 			if (slot.getStatus() == GearSlot.Status.BUY)
 			{
 				html.append(Html.color(Html.GOLD, "Buy: " + Html.escape(slot.getItem().getName())))
-					.append("<br>").append(Html.muted(Format.gp(slot.getCost())));
+					.append("<br>").append(Html.color(Html.GOLD, Format.gp(slot.getCost())));
 			}
 			else
 			{
@@ -249,8 +253,11 @@ class GearSetupView
 			}
 			if (slot.getNext() != null)
 			{
-				String price = slot.getNext().getPrice() != null ? " · " + Html.keep(Format.gp(slot.getNext().getPrice())) : "";
-				html.append("<br>").append(Html.muted("Upgrade: " + Html.escape(slot.getNext().getName()) + price));
+				html.append("<br>").append(Html.muted("Next: " + Html.escape(slot.getNext().getName())));
+				if (slot.getNext().getPrice() != null)
+				{
+					html.append("<br>").append(Html.muted(Format.gp(slot.getNext().getPrice())));
+				}
 			}
 			icons.loadItem(slot.getItem(), 1, false, picture);
 		}
@@ -265,6 +272,6 @@ class GearSetupView
 		{
 			html.append(Html.muted("Empty"));
 		}
-		return Components.pictureRow(picture, html.toString());
+		return Components.spaced(Components.pictureRow(picture, html.toString()), 8);
 	}
 }

@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
@@ -159,14 +160,23 @@ class SlayerTab extends JPanel
 		{
 			requirements.add(task.getRequires());
 		}
+		if (!requirements.isEmpty() || !task.getNeeds().isEmpty())
+		{
+			taskInfo.add(Components.gap(4));
+		}
 		if (!requirements.isEmpty())
 		{
-			taskInfo.add(Components.spaced(Components.label(Html.white("Needs:") + " " + Html.escape(String.join(", ", requirements))), 6));
+			taskInfo.add(Components.fact("Needs", lines(requirements)));
 		}
 		if (!task.getNeeds().isEmpty())
 		{
-			taskInfo.add(Components.spaced(Components.label(Html.white("Bring:") + " " + Html.escape(String.join(", ", task.getNeeds()))), 2));
+			taskInfo.add(Components.fact("Bring", lines(task.getNeeds())));
 		}
+	}
+
+	private static String lines(List<String> items)
+	{
+		return items.stream().map(Html::escape).collect(Collectors.joining("<br>"));
 	}
 
 	private void addSpots(SlayerTask task)
@@ -176,7 +186,7 @@ class SlayerTab extends JPanel
 			return;
 		}
 		taskInfo.add(Components.subheading("Where to kill them"));
-		task.getSpots().forEach(spot -> taskInfo.add(Components.spaced(Components.label(spotHtml(spot)), 4)));
+		task.getSpots().forEach(spot -> taskInfo.add(spotEntry(spot)));
 	}
 
 	/** Tips, other places, masters and skip advice, behind a link to keep the tab short. */
@@ -203,24 +213,31 @@ class SlayerTab extends JPanel
 		}
 	}
 
-	private static String spotHtml(SlayerSpot spot)
+	/** A place to kill the task: its name, what it's like there, then how to do it. */
+	private static JPanel spotEntry(SlayerSpot spot)
 	{
 		List<String> tags = new ArrayList<>();
 		if (spot.isMulti())
 		{
-			tags.add("multi-combat");
+			tags.add("Multi-combat");
 		}
 		if (spot.isCannon())
 		{
-			tags.add("cannon");
+			tags.add("Cannon");
 		}
 		if (spot.isWilderness())
 		{
 			tags.add(Html.color(Html.RED, "Wilderness"));
 		}
-		return Html.color(Html.GOLD, Html.escape(spot.getWhere()))
-			+ (tags.isEmpty() ? "" : " " + Html.muted("(" + String.join(", ", tags) + ")"))
-			+ "<br>" + Html.escape(spot.getHow());
+
+		JPanel entry = Components.entry();
+		entry.add(Components.label(Html.color(Html.GOLD, Html.escape(spot.getWhere())), Components.ENTRY_WIDTH));
+		if (!tags.isEmpty())
+		{
+			entry.add(Components.label(Html.muted(String.join(" · ", tags)), Components.ENTRY_WIDTH));
+		}
+		entry.add(Components.spaced(Components.label(Html.escape(spot.getHow()), Components.ENTRY_WIDTH), 2));
+		return entry;
 	}
 
 	private static void addList(JPanel panel, String title, List<String> items)
