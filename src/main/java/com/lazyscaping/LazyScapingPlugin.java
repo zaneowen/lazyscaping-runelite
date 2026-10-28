@@ -2,7 +2,9 @@ package com.lazyscaping;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
+import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonPrimitive;
 import com.google.inject.Provides;
 import java.awt.AlphaComposite;
 import java.awt.Graphics2D;
@@ -38,6 +40,7 @@ import net.runelite.api.events.GameTick;
 import net.runelite.api.events.ItemContainerChanged;
 import net.runelite.api.events.StatChanged;
 import net.runelite.api.gameval.InventoryID;
+import net.runelite.api.gameval.ItemID;
 import net.runelite.api.gameval.VarPlayerID;
 import net.runelite.api.gameval.VarbitID;
 import net.runelite.client.callback.ClientThread;
@@ -71,6 +74,14 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 	private static final String GOAL_LEVEL_KEY = "goalLevel";
 	private static final String GOAL_FROM_KEY = "goalFromXp";
 	private static final String GEAR_BOSS_KEY = "gearBoss";
+	private static final String TRAINING_BUDGET_KEY = "trainingBudget";
+	private static final String GEAR_BUDGET_KEY = "gearBudget";
+	private static final String BANK_COINS_KEY = "bankCoins";
+
+	/** The Training page's default budget. */
+	private static final String DEFAULT_TRAINING_BUDGET = "1M";
+	/** Gear setups start from what you own, until you give them a budget. */
+	private static final String DEFAULT_GEAR_BUDGET = Budget.FREE;
 
 	/** Skills with levels. Overall is deprecated in the API, so it's left out by name. */
 	static final List<Skill> SKILLS = Arrays.stream(Skill.values())
@@ -152,6 +163,9 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 	/** The boss picked for the gear setup, and the style picked for it (null: the best for your gear). */
 	private String gearBoss;
 	private String gearStyle;
+	/** Budgets as picked or typed, like "10M", "Unlimited" or "My coins". */
+	private String trainingBudget = DEFAULT_TRAINING_BUDGET;
+	private String gearBudget = DEFAULT_GEAR_BUDGET;
 	/** The gear the boss suggestions were fetched with. */
 	private Set<String> bossGear = Set.of();
 	private boolean bossesStale;
@@ -275,6 +289,11 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 		{
 			saveBank(event.getItemContainer());
 		}
+		if (player != null && (id == InventoryID.BANK || id == InventoryID.INV))
+		{
+			long coins = coins();
+			ui(() -> panel.setCoins(coins));
+		}
 		if (player != null && config.liveRecommendations() && (id == InventoryID.BANK || id == InventoryID.WORN || id == InventoryID.INV) && !ownedGear().equals(bossGear))
 		{
 			bossesStale = true;
@@ -392,6 +411,45 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 	}
 
 	@Override
+	public void budgetChanged(boolean gear, String budget)
+	{
+		clientThread.invoke(() ->
+		{
+			// An editable picker reports the same choice more than once.
+			if (budget.equals(gear ? gearBudget : trainingBudget))
+			{
+				return;
+			}
+			if (gear)
+			{
+				gearBudget = budget;
+			}
+			else
+			{
+				trainingBudget = budget;
+			}
+			if (player != null)
+			{
+				configManager.setRSProfileConfiguration(LazyScapingConfig.GROUP, gear ? GEAR_BUDGET_KEY : TRAINING_BUDGET_KEY, budget);
+			}
+			if (gear)
+			{
+				fetchGear();
+			}
+			else
+			{
+				fetchPlan();
+			}
+		});
+	}
+
+	private String savedBudget(String key, String fallback)
+	{
+		String saved = configManager.getRSProfileConfiguration(LazyScapingConfig.GROUP, key);
+		return Budget.isValid(saved) ? saved : fallback;
+	}
+
+	@Override
 	public void refresh()
 	{
 		clientThread.invoke(() ->
@@ -422,15 +480,22 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 
 		gearBoss = configManager.getRSProfileConfiguration(LazyScapingConfig.GROUP, GEAR_BOSS_KEY);
 		gearStyle = null;
+		trainingBudget = savedBudget(TRAINING_BUDGET_KEY, DEFAULT_TRAINING_BUDGET);
+		gearBudget = savedBudget(GEAR_BUDGET_KEY, DEFAULT_GEAR_BUDGET);
 
 		Skill skill = goalSkill;
 		int level = goalLevel;
 		String boss = gearBoss;
+		String training = trainingBudget;
+		String gear = gearBudget;
+		long coins = coins();
 		ui(() ->
 		{
 			panel.setLoggedIn(true);
 			panel.setGoal(skill, level);
 			panel.selectBoss(boss);
+			panel.setBudgets(training, gear);
+			panel.setCoins(coins);
 		});
 		planLevel = -1;
 		bossGear = Set.of();
@@ -497,6 +562,7 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 		});
 		body.add("unlocks", unlocks);
 		body.addProperty("priority", config.priority().apiValue);
+		addBudget(body, trainingBudget);
 
 		ui(() -> panel.showPlanMessage("Loading your plan..."));
 		api.plan(body, plan -> ui(() -> panel.showPlan(plan)), error -> ui(() -> panel.showPlanMessage(error)));
@@ -542,6 +608,8 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 		body.add("levels", levels());
 		body.add("owned", gson.toJsonTree(bossGear));
 		body.addProperty("members", members());
+		addBudget(body, gearBudget);
+		body.addProperty("ironman", client.getVarbitValue(VarbitID.IRONMAN) != 0);
 
 		ui(() -> panel.showGearMessage("Building your setup..."));
 		api.gear(body, setup -> ui(() -> panel.showGear(setup)), error -> ui(() -> panel.showGearMessage(error)));
@@ -608,6 +676,54 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 		{
 			configManager.setRSProfileConfiguration(LazyScapingConfig.GROUP, BANK_KEY, value);
 		}
+		String coins = String.valueOf(coinsIn(bank));
+		if (!coins.equals(configManager.getRSProfileConfiguration(LazyScapingConfig.GROUP, BANK_COINS_KEY)))
+		{
+			configManager.setRSProfileConfiguration(LazyScapingConfig.GROUP, BANK_COINS_KEY, coins);
+		}
+	}
+
+	/** Coins in the bank (as last seen) and inventory, for the "My coins" budget. */
+	private long coins()
+	{
+		String bank = configManager.getRSProfileConfiguration(LazyScapingConfig.GROUP, BANK_COINS_KEY);
+		long banked = 0;
+		try
+		{
+			banked = bank == null ? 0 : Long.parseLong(bank);
+		}
+		catch (NumberFormatException ignored)
+		{
+		}
+		return banked + coinsIn(client.getItemContainer(InventoryID.INV));
+	}
+
+	/** Coins plus platinum tokens (1,000 gp each) in a container. */
+	private static long coinsIn(ItemContainer container)
+	{
+		long gp = 0;
+		if (container != null)
+		{
+			for (Item item : container.getItems())
+			{
+				if (item.getId() == ItemID.COINS)
+				{
+					gp += item.getQuantity();
+				}
+				else if (item.getId() == ItemID.PLATINUM)
+				{
+					gp += item.getQuantity() * 1_000L;
+				}
+			}
+		}
+		return gp;
+	}
+
+	/** Adds a budget to an API request. Unlimited is sent as null. */
+	private void addBudget(JsonObject body, String budget)
+	{
+		Long gp = Budget.resolve(budget, coins());
+		body.add("budget", gp == null ? JsonNull.INSTANCE : new JsonPrimitive(gp));
 	}
 
 	/** Gear the planners know about in the bank (as last seen), worn, or in the inventory. */

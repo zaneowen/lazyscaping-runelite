@@ -51,6 +51,9 @@ class LazyScapingPanel extends PluginPanel
 		/** The player picked a boss for the gear setup (null to clear it), and maybe a style. */
 		void bossSelected(String bossId, String style);
 
+		/** The player set a valid budget for training (or for gear when `gear` is true). */
+		void budgetChanged(boolean gear, String budget);
+
 		void refresh();
 	}
 
@@ -100,7 +103,15 @@ class LazyScapingPanel extends PluginPanel
 	private final JProgressBar progressBar = new JProgressBar(0, 1000);
 	private final JLabel xpLeft = wrapped("");
 	private final JLabel rate = wrapped("");
+	private final JComboBox<String> trainingBudget = budgetBox(Budget.TRAINING_PRESETS);
+	private final JLabel trainingBudgetNote = wrapped("");
 	private final JPanel planList = column();
+	private final JComboBox<String> gearBudget = budgetBox(Budget.GEAR_PRESETS);
+	private final JLabel gearBudgetNote = wrapped("");
+	/** Holds the gear budget; hidden for ironmen, who can't buy from the GE. */
+	private JComponent gearBudgetRow;
+	/** Coins in the bank and inventory, for the "My coins" budget. */
+	private long coins;
 	private final JPanel bossList = column();
 	private final JComboBox<GearCatalog.Boss> bossBox = new JComboBox<>();
 	private final JComboBox<String> styleBox = new JComboBox<>();
@@ -112,6 +123,8 @@ class LazyScapingPanel extends PluginPanel
 	private boolean settingGoal;
 	/** The same for the gear setup's boss and style pickers. */
 	private boolean settingBoss;
+	/** The same for the budget pickers. */
+	private boolean settingBudget;
 
 	LazyScapingPanel(Actions actions, Icons icons)
 	{
@@ -186,6 +199,9 @@ class LazyScapingPanel extends PluginPanel
 		tab.add(gap(8));
 
 		JPanel plan = card("Your plan");
+		plan.add(budgetRow(trainingBudget, false, "Gp to spend on training methods"));
+		plan.add(trainingBudgetNote);
+		plan.add(gap(4));
 		plan.add(planList);
 		tab.add(plan);
 		return tab;
@@ -226,6 +242,11 @@ class LazyScapingPanel extends PluginPanel
 		setup.add(full(bossBox));
 		styleRow = full(styleBox);
 		setup.add(styleRow);
+		JPanel budget = column();
+		budget.add(budgetRow(gearBudget, true, "Gp to spend on gear upgrades and supplies"));
+		budget.add(gearBudgetNote);
+		gearBudgetRow = budget;
+		setup.add(gearBudgetRow);
 		setup.add(gearList);
 		setup.add(gap(4));
 		JButton fullPlan = button("Full gear plan on lazyscaping.app");
@@ -285,6 +306,81 @@ class LazyScapingPanel extends PluginPanel
 		Skill skill = LazyScapingPlugin.skillNamed((String) skillBox.getSelectedItem());
 		targetSpinner.setEnabled(skill != null);
 		actions.goalChanged(skill, (Integer) targetSpinner.getValue());
+	}
+
+	/** A labelled, editable budget picker: a preset or an amount like "25m". */
+	private JComponent budgetRow(JComboBox<String> box, boolean gear, String tooltip)
+	{
+		box.setToolTipText(tooltip + ". Pick one, or type an amount like 25m.");
+		box.addActionListener(e -> budgetEdited(box, gear));
+		JLabel label = new JLabel("Budget");
+		label.setFont(FontManager.getRunescapeSmallFont());
+		label.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+		JPanel row = new JPanel(new BorderLayout(6, 0));
+		row.setOpaque(false);
+		row.add(label, BorderLayout.WEST);
+		row.add(box, BorderLayout.CENTER);
+		return full(row);
+	}
+
+	private static JComboBox<String> budgetBox(String[] presets)
+	{
+		JComboBox<String> box = new JComboBox<>(presets);
+		box.setEditable(true);
+		return box;
+	}
+
+	private void budgetEdited(JComboBox<String> box, boolean gear)
+	{
+		if (settingBudget)
+		{
+			return;
+		}
+		Object value = box.getSelectedItem();
+		String text = value == null ? "" : value.toString().trim();
+		updateBudgetNote(box, gear ? gearBudgetNote : trainingBudgetNote);
+		if (Budget.isValid(text))
+		{
+			actions.budgetChanged(gear, text);
+		}
+	}
+
+	/** Shows budgets without reporting them back as changes. */
+	void setBudgets(String training, String gear)
+	{
+		settingBudget = true;
+		trainingBudget.setSelectedItem(training);
+		gearBudget.setSelectedItem(gear);
+		settingBudget = false;
+		updateBudgetNote(trainingBudget, trainingBudgetNote);
+		updateBudgetNote(gearBudget, gearBudgetNote);
+	}
+
+	/** The coins "My coins" stands for. */
+	void setCoins(long coins)
+	{
+		this.coins = coins;
+		updateBudgetNote(trainingBudget, trainingBudgetNote);
+		updateBudgetNote(gearBudget, gearBudgetNote);
+	}
+
+	private void updateBudgetNote(JComboBox<String> box, JLabel note)
+	{
+		Object value = box.getSelectedItem();
+		String text = value == null ? "" : value.toString().trim();
+		if (!Budget.isValid(text))
+		{
+			note.setText("<font color='" + hex(MISSING) + "'>Type an amount like 25m, or Unlimited.</font>");
+		}
+		else if (Budget.isMyCoins(text))
+		{
+			note.setText(gp(coins) + " in your bank and inventory" + (coins == 0 ? " (open your bank once)" : ""));
+		}
+		else
+		{
+			note.setText("");
+		}
+		note.setVisible(!note.getText().isEmpty());
 	}
 
 	/** The bosses the gear setup can be picked for, keeping the current pick. */
@@ -369,6 +465,10 @@ class LazyScapingPanel extends PluginPanel
 		{
 			String cost = plan.totalCost > 0 ? " · costs " + gp(plan.totalCost) : plan.totalCost < 0 ? " · makes " + gp(-plan.totalCost) : "";
 			planList.add(wrapped("About " + hours(plan.totalHours) + cost));
+			if (plan.overBudget)
+			{
+				planList.add(wrapped("<font color='" + hex(MISSING) + "'>Over your budget, so this uses the cheapest methods.</font>"));
+			}
 			for (LazyScapingApi.PlanStep step : plan.steps)
 			{
 				JLabel label = wrapped("<font color='#ffffff'>Level " + step.fromLevel + "-" + step.toLevel + "</font><br>"
@@ -452,16 +552,29 @@ class LazyScapingPanel extends PluginPanel
 		styleBox.setSelectedItem(setup.style);
 		styleRow.setVisible(setup.styles != null && setup.styles.size() > 1);
 		settingBoss = false;
+		gearBudgetRow.setVisible(!setup.ironman);
 
 		gearList.removeAll();
 		String name = setup.boss != null ? setup.boss.name : "";
-		gearList.add(wrapped("<font color='#ffffff'>" + escape(name) + "</font><br>" + escape(setup.style) + " · from the gear you own"));
+		String source = setup.ironman ? "from the gear you own (ironmen can't buy)"
+			: setup.budget != null && setup.budget == 0 ? "from the gear you own"
+			: "from your gear, plus " + (setup.budget == null ? "any upgrades" : "up to " + gp(setup.budget));
+		gearList.add(wrapped("<font color='#ffffff'>" + escape(name) + "</font><br>" + escape(setup.style) + " · " + source));
 		if (setup.noGear != null)
 		{
 			gearList.add(wrapped(escape(setup.noGear)));
 		}
 		else
 		{
+			if (setup.suppliesOverBudget)
+			{
+				gearList.add(wrapped("<font color='" + hex(MISSING) + "'>Supplies cost more than your budget, so no gear was bought.</font>"));
+			}
+			if (setup.gearCost > 0)
+			{
+				gearList.add(wrapped("Buying upgrades: <font color='" + hex(GOLD) + "'>" + gp(setup.gearCost) + "</font>"
+					+ (setup.budget != null ? " of " + gp(setup.budget) : "")));
+			}
 			gearList.add(costSummary(setup));
 			addSlots(setup.picks);
 			if (setup.switches != null)
@@ -526,9 +639,9 @@ class LazyScapingPanel extends PluginPanel
 		}
 		if (empty == 0)
 		{
-			return wrapped("<font color='" + hex(READY) + "'>Every slot filled from your gear.</font>");
+			return wrapped("<font color='" + hex(READY) + "'>Every slot is filled.</font>");
 		}
-		String text = "Filling " + empty + " empty slot" + (empty == 1 ? "" : "s") + ": <font color='" + hex(GOLD) + "'>" + gp(cost) + "</font>";
+		String text = "Still empty: " + empty + " slot" + (empty == 1 ? "" : "s") + ", <font color='" + hex(GOLD) + "'>" + gp(cost) + "</font>";
 		if (untradeable > 0)
 		{
 			text += " + " + untradeable + " untradeable";
@@ -581,6 +694,17 @@ class LazyScapingPanel extends PluginPanel
 		if ("twoHanded".equals(s.status))
 		{
 			text.append("<font color='").append(MUTED).append("'>Two-handed weapon</font>");
+		}
+		else if (s.item != null && "buy".equals(s.status))
+		{
+			// Bought with the budget.
+			text.append("<font color='").append(hex(GOLD)).append("'>Buy: ").append(escape(s.item.name)).append("</font><br><font color='")
+				.append(MUTED).append("'>").append(gp(s.cost)).append("</font>");
+			if (s.next != null)
+			{
+				text.append("<br><font color='").append(MUTED).append("'>Upgrade: ").append(escape(s.next.name)).append(price(s.next)).append("</font>");
+			}
+			icons.load(s.item, false, picture);
 		}
 		else if (s.item != null)
 		{

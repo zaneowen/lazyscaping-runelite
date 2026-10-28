@@ -56,6 +56,8 @@ class LazyScapingApi
 		boolean goalReached;
 		double totalHours;
 		long totalCost;
+		/** Even the cheapest methods cost more than the budget. */
+		boolean overBudget;
 		List<PlanStep> steps;
 	}
 
@@ -98,8 +100,10 @@ class LazyScapingApi
 	static class GearSlot
 	{
 		String slot;
-		/** "owned", "none" or "twoHanded" (the weapon takes this slot). */
+		/** "owned", "buy" (bought with the budget), "none" or "twoHanded" (the weapon takes this slot). */
 		String status;
+		/** Gp spent on this slot when it's bought. */
+		long cost;
 		/** The best item you own for the slot, or null. */
 		GearItem item;
 		/** The next item to work towards. */
@@ -137,6 +141,13 @@ class LazyScapingApi
 		List<ItemLine> utility;
 		/** GE cost of the supplies and utility items for one trip. */
 		long tripCost;
+		/** The budget the setup was built with, null for unlimited. */
+		Long budget;
+		boolean ironman;
+		/** Gp spent on gear from the budget. */
+		long gearCost;
+		/** Supplies alone cost more than the budget, so no gear was bought. */
+		boolean suppliesOverBudget;
 	}
 
 	/** One of the site's item pictures, for items the game can't draw by id. */
