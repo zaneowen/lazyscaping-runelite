@@ -2,19 +2,21 @@ package com.lazyscaping;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 import com.google.gson.Gson;
-import java.util.List;
-import java.util.Map;
+import com.lazyscaping.api.Catalog;
 import org.junit.Test;
 
 public class GearCatalogTest
 {
-	private final GearCatalog catalog = new GearCatalog(Map.of(
-		"abyssal_whip", List.of("abyssal whip"),
-		"trident_of_the_seas", List.of("trident of the seas", "uncharged trident"),
-		"osmumtens_fang", List.of("osmumten's fang"),
-		"ahrims_robetop", List.of("ahrim's robetop")
-	), List.of());
+	private static final Gson GSON = new Gson();
+
+	private final GearCatalog catalog = new GearCatalog(GSON.fromJson("{\"gear\": {"
+		+ "\"abyssal_whip\": [\"abyssal whip\"],"
+		+ "\"trident_of_the_seas\": [\"trident of the seas\", \"uncharged trident\"],"
+		+ "\"osmumtens_fang\": [\"osmumten's fang\"],"
+		+ "\"ahrims_robetop\": [\"ahrim's robetop\"]"
+		+ "}}", Catalog.class));
 
 	@Test
 	public void matchesNamesAndAliases()
@@ -40,11 +42,11 @@ public class GearCatalogTest
 	}
 
 	@Test
-	public void bundledCatalogLoads()
+	public void loadsBundledCatalog()
 	{
-		GearCatalog bundled = GearCatalog.bundled(new Gson());
+		GearCatalog bundled = GearCatalog.bundled(GSON);
 		assertEquals("abyssal_whip", bundled.match("Abyssal whip"));
 		assertEquals("toxic_blowpipe", bundled.match("Toxic blowpipe (empty)"));
-		assertEquals(true, bundled.bosses().stream().anyMatch(b -> "vorkath".equals(b.id) && "Vorkath".equals(b.name)));
+		assertTrue(bundled.getBosses().stream().anyMatch(b -> "vorkath".equals(b.getId()) && "Vorkath".equals(b.getName())));
 	}
 }

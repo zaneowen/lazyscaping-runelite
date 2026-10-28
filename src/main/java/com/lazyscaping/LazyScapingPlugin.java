@@ -7,14 +7,20 @@ import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 import com.google.inject.Provides;
+import com.lazyscaping.api.LazyScapingClient;
+import com.lazyscaping.ui.GoalProgress;
+import com.lazyscaping.ui.LazyScapingPanel;
+import com.lazyscaping.ui.PanelActions;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.Collections;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
 import javax.inject.Inject;
 import javax.swing.SwingUtilities;
+import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.Experience;
 import net.runelite.api.GameState;
@@ -39,23 +45,22 @@ import net.runelite.client.util.ImageUtil;
 import net.runelite.client.util.LinkBrowser;
 import okhttp3.HttpUrl;
 
+@Slf4j
 @PluginDescriptor(
 	name = "LazyScaping",
 	description = "Your training goal, plan and methods, and boss gear setups from lazyscaping.app, with one-click sync of your gear and quests",
 	tags = {"training", "goal", "planner", "xp", "boss", "gear", "bank"}
 )
 @PluginDependency(XpTrackerPlugin.class)
-public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Actions
+public class LazyScapingPlugin extends Plugin implements PanelActions
 {
-	/** The Training page's default budget. */
 	private static final String DEFAULT_TRAINING_BUDGET = "1M";
-	/** Gear setups start from what you own, until you give them a budget. */
 	private static final String DEFAULT_GEAR_BUDGET = Budget.FREE;
-	/** How often the goal's xp/hr and time left update, in game ticks (3 seconds). */
-	private static final int PROGRESS_TICKS = 5;
-	/** The gear setup is fetched again after a level-up or new gear, at most this often, in game ticks (a minute). */
+	private static final int MAX_LEVEL = 99;
+	/** Game ticks between goal progress updates. */
+	private static final int PROGRESS_UPDATE_TICKS = 5;
+	/** Minimum game ticks between gear setup refreshes after the player's gear or levels change. */
 	private static final int GEAR_REFRESH_TICKS = 100;
-	/** The only site the guides' links may open, besides lazyscaping.app. */
 	private static final String WIKI_HOST = "oldschool.runescape.wiki";
 
 	@Inject
@@ -74,7 +79,7 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 	private LazyScapingConfig config;
 
 	@Inject
-	private LazyScapingApi api;
+	private LazyScapingClient api;
 
 	@Inject
 	private Account account;
@@ -83,44 +88,38 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 	private ProfileSettings settings;
 
 	@Inject
-	private OwnedItems owned;
+	private OwnedItems ownedItems;
 
 	@Inject
-	private ItemIcons icons;
+	private ItemIconLoader iconLoader;
 
 	@Inject
 	private Gson gson;
 
-	/** Read on the Swing thread, so `ui` sees it cleared when the plugin stops. */
 	private volatile LazyScapingPanel panel;
 	private NavigationButton navButton;
-	/** Bundled with the plugin, then replaced by the site's current one when live recommendations are on. */
 	private volatile GearCatalog catalog;
 
-	// Everything below is only touched on the client thread.
-	/** The logged-in player, once their stats have loaded. */
-	private String player;
+	// Client thread state
+	private String playerName;
 	private boolean loadPending;
-	private int ticks;
-	private final Map<Skill, Integer> knownLevels = new EnumMap<>(Skill.class);
+	private int tickCount;
+	private final Map<Skill, Integer> levels = new EnumMap<>(Skill.class);
 
 	private Skill goalSkill;
 	private int goalLevel;
-	private long goalFromXp;
-	/** A training method picked for the goal's plan, or null for the best plan. */
+	private long goalStartXp;
 	private String goalMethod;
-	/** The goal skill's level when the plan was fetched, so a level-up fetches it again. */
+	/** The goal skill's level when the plan was last fetched. */
 	private int planLevel = -1;
 
-	/** The boss picked for the gear setup, and the style picked for it (null: the best for your gear). */
 	private String gearBoss;
 	private String gearStyle;
-	/** The gear the setup was fetched with, so new gear fetches it again. */
-	private Set<String> setupGear = Set.of();
-	private boolean gearStale;
-	private int lastGearFetch = -GEAR_REFRESH_TICKS;
+	/** The owned gear the current setup was fetched with. */
+	private Set<String> setupGear = Collections.emptySet();
+	private boolean setupStale;
+	private int lastSetupFetchTick = -GEAR_REFRESH_TICKS;
 
-	/** Budgets as picked or typed, like "10M", "Unlimited" or "My coins". */
 	private String trainingBudget = DEFAULT_TRAINING_BUDGET;
 	private String gearBudget = DEFAULT_GEAR_BUDGET;
 
@@ -134,7 +133,10 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 	protected void startUp()
 	{
 		catalog = GearCatalog.bundled(gson);
-		panel = new LazyScapingPanel(this, icons);
+		panel = new LazyScapingPanel(this, iconLoader);
+		panel.setLiveEnabled(config.liveRecommendations());
+		panel.setBossOptions(catalog.getBosses());
+
 		navButton = NavigationButton.builder()
 			.tooltip("LazyScaping")
 			.icon(ImageUtil.loadImageResource(getClass(), "panel_icon.png"))
@@ -142,8 +144,7 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 			.panel(panel)
 			.build();
 		clientToolbar.addNavigation(navButton);
-		panel.setLiveEnabled(config.liveRecommendations());
-		panel.setBossOptions(catalog.bosses());
+
 		if (config.liveRecommendations())
 		{
 			fetchCatalog();
@@ -157,12 +158,12 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 		clientToolbar.removeNavigation(navButton);
 		navButton = null;
 		panel = null;
-		icons.clear();
+		iconLoader.clear();
 		clientThread.invoke(() ->
 		{
-			player = null;
+			playerName = null;
 			loadPending = false;
-			knownLevels.clear();
+			levels.clear();
 		});
 	}
 
@@ -171,56 +172,61 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 	{
 		if (event.getGameState() == GameState.LOGGED_IN)
 		{
-			// Stats and the player's name arrive over the next tick or two.
+			// the player's name and stats arrive over the next tick or two
 			loadPending = true;
 		}
 		else if (event.getGameState() == GameState.LOGIN_SCREEN)
 		{
-			player = null;
-			ui(p -> p.setLoggedIn(false));
+			playerName = null;
+			updatePanel(p -> p.setLoggedIn(false));
 		}
 	}
 
 	@Subscribe
 	public void onGameTick(GameTick tick)
 	{
-		ticks++;
-		String name = loadPending ? account.name() : null;
-		if (name != null)
+		tickCount++;
+		if (loadPending)
 		{
-			loadPending = false;
-			// World hops log in again; only a different account needs loading.
-			if (!name.equals(player))
+			String name = account.name();
+			if (name != null)
 			{
-				player = name;
-				loadAccount();
+				loadPending = false;
+				// world hops log in again, but only a different account needs loading
+				if (!name.equals(playerName))
+				{
+					playerName = name;
+					loadAccount();
+				}
 			}
 		}
-		if (player == null)
+
+		if (playerName == null)
 		{
 			return;
 		}
-		if (ticks % PROGRESS_TICKS == 0)
+		if (tickCount % PROGRESS_UPDATE_TICKS == 0)
 		{
 			updateProgress();
 		}
-		if (gearStale && ticks - lastGearFetch >= GEAR_REFRESH_TICKS)
+		if (setupStale && tickCount - lastSetupFetchTick >= GEAR_REFRESH_TICKS)
 		{
-			fetchGear();
+			fetchGearSetup();
 		}
 	}
 
 	@Subscribe
 	public void onStatChanged(StatChanged event)
 	{
-		if (player == null)
+		if (playerName == null)
 		{
 			return;
 		}
-		Integer known = knownLevels.put(event.getSkill(), event.getLevel());
-		if (known != null && known != event.getLevel())
+
+		Integer previous = levels.put(event.getSkill(), event.getLevel());
+		if (previous != null && previous != event.getLevel())
 		{
-			gearStale = true;
+			setupStale = true;
 		}
 		if (event.getSkill() == goalSkill)
 		{
@@ -235,27 +241,28 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 	@Subscribe
 	public void onItemContainerChanged(ItemContainerChanged event)
 	{
-		int id = event.getContainerId();
-		if (id != InventoryID.BANK && id != InventoryID.INV && id != InventoryID.WORN)
+		int containerId = event.getContainerId();
+		if (containerId != InventoryID.BANK && containerId != InventoryID.INV && containerId != InventoryID.WORN)
 		{
 			return;
 		}
-		if (id == InventoryID.BANK)
+
+		if (containerId == InventoryID.BANK)
 		{
-			owned.bankChanged(event.getItemContainer());
+			ownedItems.onBankChanged(event.getItemContainer());
 		}
-		if (player == null)
+		if (playerName == null)
 		{
 			return;
 		}
-		if (id != InventoryID.WORN)
+		if (containerId != InventoryID.WORN)
 		{
-			long coins = owned.coins();
-			ui(p -> p.setCoins(coins));
+			long coins = ownedItems.coins();
+			updatePanel(p -> p.setCoins(coins));
 		}
-		if (gearBoss != null && config.liveRecommendations() && !owned.gear(catalog).equals(setupGear))
+		if (gearBoss != null && config.liveRecommendations() && !ownedItems.gear(catalog).equals(setupGear))
 		{
-			gearStale = true;
+			setupStale = true;
 		}
 	}
 
@@ -266,57 +273,60 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 		{
 			return;
 		}
-		if ("liveRecommendations".equals(event.getKey()))
+
+		switch (event.getKey())
 		{
-			boolean live = config.liveRecommendations();
-			ui(p -> p.setLiveEnabled(live));
-			if (live)
-			{
-				fetchCatalog();
-			}
-			clientThread.invoke(() ->
-			{
-				planLevel = -1;
-				fetchPlan();
-				fetchGear();
-			});
-		}
-		else if ("priority".equals(event.getKey()))
-		{
-			clientThread.invoke(this::fetchPlan);
+			case "liveRecommendations":
+				boolean live = config.liveRecommendations();
+				updatePanel(p -> p.setLiveEnabled(live));
+				if (live)
+				{
+					fetchCatalog();
+				}
+				clientThread.invoke(() ->
+				{
+					planLevel = -1;
+					fetchPlan();
+					fetchGearSetup();
+				});
+				break;
+			case "priority":
+				clientThread.invoke(this::fetchPlan);
+				break;
+			default:
+				break;
 		}
 	}
-
-	// Panel actions. These arrive on the Swing thread, and go to the client thread to read the game.
 
 	@Override
 	public void goalChanged(Skill skill, int targetLevel)
 	{
 		clientThread.invoke(() ->
 		{
-			if (player == null)
+			if (playerName == null)
 			{
 				return;
 			}
+
 			int target = targetLevel;
 			if (skill != null && skill != goalSkill)
 			{
-				// A new skill starts one level up, progress counts from now, and an
-				// earlier picked method belonged to the old skill.
-				target = Math.min(99, account.level(skill) + 1);
-				goalFromXp = account.xp(skill);
+				// a new goal starts one level up, counts progress from now, and drops the old skill's method
+				target = Math.min(MAX_LEVEL, account.level(skill) + 1);
+				goalStartXp = account.xp(skill);
 				goalMethod = null;
 				settings.set(ProfileSettings.GOAL_METHOD, null);
-				int shown = target;
-				ui(p -> p.setGoal(skill, shown));
+				int shownTarget = target;
+				updatePanel(p -> p.setGoal(skill, shownTarget));
 			}
+
 			goalSkill = skill;
 			goalLevel = target;
 			settings.set(ProfileSettings.GOAL_SKILL, skill == null ? null : skill.getName());
 			if (skill != null)
 			{
 				settings.set(ProfileSettings.GOAL_LEVEL, goalLevel);
-				settings.set(ProfileSettings.GOAL_FROM_XP, goalFromXp);
+				settings.set(ProfileSettings.GOAL_FROM_XP, goalStartXp);
 			}
 			planLevel = -1;
 			updateProgress();
@@ -330,7 +340,7 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 		clientThread.invoke(() ->
 		{
 			goalMethod = methodId;
-			if (player != null)
+			if (playerName != null)
 			{
 				settings.set(ProfileSettings.GOAL_METHOD, methodId);
 			}
@@ -345,11 +355,11 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 		{
 			gearBoss = bossId;
 			gearStyle = style;
-			if (player != null)
+			if (playerName != null)
 			{
 				settings.set(ProfileSettings.GEAR_BOSS, bossId);
 			}
-			fetchGear();
+			fetchGearSetup();
 		});
 	}
 
@@ -358,29 +368,22 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 	{
 		clientThread.invoke(() ->
 		{
-			// An editable picker reports the same choice more than once.
+			// editable combo boxes report the same value more than once
 			if (budget.equals(gear ? gearBudget : trainingBudget))
 			{
 				return;
 			}
+
 			if (gear)
 			{
 				gearBudget = budget;
+				saveIfLoggedIn(ProfileSettings.GEAR_BUDGET, budget);
+				fetchGearSetup();
 			}
 			else
 			{
 				trainingBudget = budget;
-			}
-			if (player != null)
-			{
-				settings.set(gear ? ProfileSettings.GEAR_BUDGET : ProfileSettings.TRAINING_BUDGET, budget);
-			}
-			if (gear)
-			{
-				fetchGear();
-			}
-			else
-			{
+				saveIfLoggedIn(ProfileSettings.TRAINING_BUDGET, budget);
 				fetchPlan();
 			}
 		});
@@ -391,14 +394,14 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 	{
 		clientThread.invoke(() ->
 		{
-			if (player == null)
+			if (playerName == null)
 			{
 				return;
 			}
 			planLevel = -1;
 			updateProgress();
 			fetchPlan();
-			fetchGear();
+			fetchGearSetup();
 		});
 	}
 
@@ -409,14 +412,16 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 	}
 
 	@Override
-	public void openBoss(String bossId)
+	public void openBossPlan(String bossId)
 	{
 		clientThread.invoke(() ->
 		{
-			HttpUrl.Builder url = LazyScapingApi.SITE.newBuilder().addPathSegment("bosses").addQueryParameter("boss", bossId);
-			if (player != null)
+			HttpUrl.Builder url = LazyScapingClient.SITE.newBuilder()
+				.addPathSegment("bosses")
+				.addQueryParameter("boss", bossId);
+			if (playerName != null)
 			{
-				url.addQueryParameter("player", player);
+				url.addQueryParameter("player", playerName);
 				String type = account.hiscoresType();
 				if (!"normal".equals(type))
 				{
@@ -428,9 +433,8 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 	}
 
 	@Override
-	public void openUrl(String url)
+	public void openWiki(String url)
 	{
-		// Only the OSRS Wiki links the site's guides carry.
 		HttpUrl parsed = HttpUrl.parse(url);
 		if (parsed != null && parsed.isHttps() && parsed.host().equals(WIKI_HOST))
 		{
@@ -438,19 +442,15 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 		}
 	}
 
-	// Everything below runs on the client thread.
-
 	private void loadAccount()
 	{
-		knownLevels.clear();
-		for (Skill skill : Account.SKILLS)
-		{
-			knownLevels.put(skill, account.level(skill));
-		}
-		owned.load();
-		goalSkill = Account.skillNamed(settings.get(ProfileSettings.GOAL_SKILL));
-		goalLevel = (int) settings.getLong(ProfileSettings.GOAL_LEVEL, 99);
-		goalFromXp = settings.getLong(ProfileSettings.GOAL_FROM_XP, 0);
+		levels.clear();
+		Skills.ALL.forEach(skill -> levels.put(skill, account.level(skill)));
+		ownedItems.load();
+
+		goalSkill = Skills.byName(settings.get(ProfileSettings.GOAL_SKILL));
+		goalLevel = (int) settings.getLong(ProfileSettings.GOAL_LEVEL, MAX_LEVEL);
+		goalStartXp = settings.getLong(ProfileSettings.GOAL_FROM_XP, 0);
 		goalMethod = settings.get(ProfileSettings.GOAL_METHOD);
 		gearBoss = settings.get(ProfileSettings.GEAR_BOSS);
 		gearStyle = null;
@@ -462,96 +462,108 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 		String boss = gearBoss;
 		String training = trainingBudget;
 		String gear = gearBudget;
-		long coins = owned.coins();
-		ui(p ->
+		long coins = ownedItems.coins();
+		updatePanel(p ->
 		{
 			p.setLoggedIn(true);
 			p.setChoices(skill, level, boss, training, gear);
 			p.setCoins(coins);
 		});
+
 		planLevel = -1;
-		setupGear = Set.of();
+		setupGear = Collections.emptySet();
 		updateProgress();
 		fetchPlan();
-		fetchGear();
+		fetchGearSetup();
 	}
 
-	private String savedBudget(String key, String fallback)
+	private String savedBudget(String key, String defaultValue)
 	{
 		String saved = settings.get(key);
-		return Budget.isValid(saved) ? saved : fallback;
+		return Budget.isValid(saved) ? saved : defaultValue;
+	}
+
+	private void saveIfLoggedIn(String key, String value)
+	{
+		if (playerName != null)
+		{
+			settings.set(key, value);
+		}
 	}
 
 	private void updateProgress()
 	{
 		if (goalSkill == null)
 		{
-			ui(p -> p.showProgress(null));
+			updatePanel(p -> p.showProgress(null));
 			return;
 		}
-		LazyScapingPanel.Progress progress = new LazyScapingPanel.Progress();
-		progress.level = account.level(goalSkill);
-		progress.xp = account.xp(goalSkill);
-		progress.targetXp = Experience.getXpForLevel(goalLevel);
-		// Goals set before any xp was tracked count from the start of the current level.
-		progress.fromXp = goalFromXp > 0 && goalFromXp <= progress.xp ? goalFromXp : Experience.getXpForLevel(Math.max(1, progress.level));
-		progress.xpHr = xpTrackerService.getXpHr(goalSkill);
-		ui(p -> p.showProgress(progress));
+
+		int level = account.level(goalSkill);
+		int xp = account.xp(goalSkill);
+		// goals saved before progress was tracked count from the start of the current level
+		long startXp = goalStartXp > 0 && goalStartXp <= xp ? goalStartXp : Experience.getXpForLevel(Math.max(1, level));
+		GoalProgress progress = new GoalProgress(level, xp, startXp, Experience.getXpForLevel(goalLevel), xpTrackerService.getXpHr(goalSkill));
+		updatePanel(p -> p.showProgress(progress));
 	}
 
 	private void fetchPlan()
 	{
 		if (goalSkill == null)
 		{
-			ui(p -> p.showPlanMessage(null));
+			updatePanel(p -> p.showPlanMessage(null));
 			return;
 		}
-		if (player == null || !config.liveRecommendations())
+		if (playerName == null || !config.liveRecommendations())
 		{
 			return;
 		}
+
 		planLevel = account.level(goalSkill);
+		JsonArray unlocks = new JsonArray();
+		account.questUnlocks().forEach((id, done) ->
+		{
+			if (done)
+			{
+				unlocks.add(id);
+			}
+		});
+
 		JsonObject body = new JsonObject();
 		body.addProperty("skill", goalSkill.getName());
 		body.addProperty("xp", account.xp(goalSkill));
 		body.addProperty("target", goalLevel);
 		body.add("levels", account.levels());
-		body.addProperty("members", account.members());
-		body.addProperty("ironman", account.ironman());
-		JsonArray unlocks = new JsonArray();
-		account.questUnlocks().forEach((key, done) ->
-		{
-			if (done)
-			{
-				unlocks.add(key);
-			}
-		});
+		body.addProperty("members", account.isMember());
+		body.addProperty("ironman", account.isIronman());
 		body.add("unlocks", unlocks);
-		body.addProperty("priority", config.priority().apiValue);
-		body.add("budget", budget(trainingBudget));
+		body.addProperty("priority", config.priority().getApiName());
+		body.add("budget", budgetJson(trainingBudget));
 		if (goalMethod != null)
 		{
 			body.addProperty("method", goalMethod);
 		}
 
-		ui(p -> p.showPlanMessage("Loading your plan..."));
-		api.plan(body, plan -> ui(p -> p.showPlan(plan)), error -> ui(p -> p.showPlanMessage(error)));
+		updatePanel(p -> p.showPlanMessage("Loading your plan..."));
+		api.plan(body, plan -> updatePanel(p -> p.showPlan(plan)), error -> updatePanel(p -> p.showPlanMessage(error)));
 	}
 
-	private void fetchGear()
+	private void fetchGearSetup()
 	{
-		gearStale = false;
+		setupStale = false;
 		if (gearBoss == null)
 		{
-			ui(p -> p.showGearMessage(null));
+			updatePanel(p -> p.showGearMessage(null));
 			return;
 		}
-		if (player == null || !config.liveRecommendations())
+		if (playerName == null || !config.liveRecommendations())
 		{
 			return;
 		}
-		lastGearFetch = ticks;
-		setupGear = owned.gear(catalog);
+
+		lastSetupFetchTick = tickCount;
+		setupGear = ownedItems.gear(catalog);
+
 		JsonObject body = new JsonObject();
 		body.addProperty("boss", gearBoss);
 		if (gearStyle != null)
@@ -560,51 +572,50 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 		}
 		body.add("levels", account.levels());
 		body.add("owned", gson.toJsonTree(setupGear));
-		body.addProperty("members", account.members());
-		body.add("budget", budget(gearBudget));
-		body.addProperty("ironman", account.ironman());
+		body.addProperty("members", account.isMember());
+		body.addProperty("ironman", account.isIronman());
+		body.add("budget", budgetJson(gearBudget));
 
-		ui(p -> p.showGearMessage("Building your setup..."));
-		api.gear(body, setup -> ui(p -> p.showGear(setup)), error -> ui(p -> p.showGearMessage(error)));
+		updatePanel(p -> p.showGearMessage("Building your setup..."));
+		api.gearSetup(body, setup -> updatePanel(p -> p.showGearSetup(setup)), error -> updatePanel(p -> p.showGearMessage(error)));
 	}
 
-	/** A budget for the API: gp, or null for unlimited. */
-	private JsonElement budget(String budget)
+	/** A budget as the API expects it: gp, or null for unlimited. */
+	private JsonElement budgetJson(String budget)
 	{
-		Long gp = Budget.resolve(budget, owned.coins());
+		Long gp = Budget.resolve(budget, ownedItems.coins());
 		return gp == null ? JsonNull.INSTANCE : new JsonPrimitive(gp);
 	}
 
-	/** The site's current gear list and bosses, in place of the bundled copy. */
 	private void fetchCatalog()
 	{
-		api.catalog(c ->
+		api.catalog(response ->
 		{
-			catalog = c;
-			// An older catalog has no bosses; keep the bundled ones then.
-			if (!c.bosses().isEmpty())
+			GearCatalog updated = new GearCatalog(response);
+			catalog = updated;
+			// keep the bundled bosses if the response predates the boss list
+			if (!updated.getBosses().isEmpty())
 			{
-				ui(p -> p.setBossOptions(c.bosses()));
+				updatePanel(p -> p.setBossOptions(updated.getBosses()));
 			}
 		});
 	}
 
 	/**
-	 * Opens lazyscaping.app with this account's name, type, gear and quest
-	 * unlocks filled in. They go after the # in the link, which browsers never
-	 * send to the server: the site saves them in the browser (src/app/sync).
+	 * Opens lazyscaping.app with this account's details filled in. They're sent
+	 * after the # in the link, which browsers never send to the server.
 	 */
 	private void openSync()
 	{
 		JsonObject payload = new JsonObject();
 		payload.addProperty("v", 1);
 		payload.addProperty("to", "training");
-		if (player != null)
+		if (playerName != null)
 		{
-			payload.addProperty("rsn", player);
+			payload.addProperty("rsn", playerName);
 			payload.addProperty("type", account.hiscoresType());
-			payload.addProperty("members", account.members());
-			payload.add("gear", gson.toJsonTree(owned.gear(catalog)));
+			payload.addProperty("members", account.isMember());
+			payload.add("gear", gson.toJsonTree(ownedItems.gear(catalog)));
 			payload.add("quests", gson.toJsonTree(account.questUnlocks()));
 			if (goalSkill != null)
 			{
@@ -612,19 +623,20 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 				payload.addProperty("target", goalLevel);
 			}
 		}
+
 		String data = Base64.getUrlEncoder().withoutPadding().encodeToString(gson.toJson(payload).getBytes(StandardCharsets.UTF_8));
-		LinkBrowser.browse(LazyScapingApi.SITE.newBuilder().addPathSegment("sync").fragment("d=" + data).build().toString());
+		LinkBrowser.browse(LazyScapingClient.SITE.newBuilder().addPathSegment("sync").fragment("d=" + data).build().toString());
 	}
 
-	/** Updates the panel on the Swing thread, unless the plugin has stopped since. */
-	private void ui(Consumer<LazyScapingPanel> update)
+	/** Updates the panel on the Swing thread, if the plugin is still running. */
+	private void updatePanel(Consumer<LazyScapingPanel> update)
 	{
 		SwingUtilities.invokeLater(() ->
 		{
-			LazyScapingPanel p = panel;
-			if (p != null)
+			LazyScapingPanel current = panel;
+			if (current != null)
 			{
-				update.accept(p);
+				update.accept(current);
 			}
 		});
 	}

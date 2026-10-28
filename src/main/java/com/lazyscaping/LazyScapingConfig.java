@@ -1,5 +1,7 @@
 package com.lazyscaping;
 
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
@@ -9,20 +11,17 @@ public interface LazyScapingConfig extends Config
 {
 	String GROUP = "lazyscaping";
 
+	@Getter
+	@RequiredArgsConstructor
 	enum Priority
 	{
-		FASTEST("fastest", "Fastest"),
-		CHEAPEST("cheapest", "Cheapest"),
-		AFK("afk", "AFK");
+		FASTEST("Fastest", "fastest"),
+		CHEAPEST("Cheapest", "cheapest"),
+		AFK("AFK", "afk");
 
-		final String apiValue;
 		private final String label;
-
-		Priority(String apiValue, String label)
-		{
-			this.apiValue = apiValue;
-			this.label = label;
-		}
+		/** The name lazyscaping.app's API uses. */
+		private final String apiName;
 
 		@Override
 		public String toString()

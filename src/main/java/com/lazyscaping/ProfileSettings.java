@@ -4,7 +4,7 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import net.runelite.client.config.ConfigManager;
 
-/** Choices and remembered data saved per account (RuneScape profile), in the plugin's config group. */
+/** Choices and remembered data stored per RuneScape profile. */
 @Singleton
 class ProfileSettings
 {
@@ -18,28 +18,38 @@ class ProfileSettings
 	static final String TRAINING_BUDGET = "trainingBudget";
 	static final String GEAR_BUDGET = "gearBudget";
 
+	private final ConfigManager configManager;
+
 	@Inject
-	private ConfigManager configManager;
+	ProfileSettings(ConfigManager configManager)
+	{
+		this.configManager = configManager;
+	}
 
 	String get(String key)
 	{
 		return configManager.getRSProfileConfiguration(LazyScapingConfig.GROUP, key);
 	}
 
-	long getLong(String key, long fallback)
+	long getLong(String key, long defaultValue)
 	{
 		String value = get(key);
+		if (value == null)
+		{
+			return defaultValue;
+		}
+
 		try
 		{
-			return value == null ? fallback : Long.parseLong(value);
+			return Long.parseLong(value);
 		}
 		catch (NumberFormatException e)
 		{
-			return fallback;
+			return defaultValue;
 		}
 	}
 
-	/** Saves a value, or forgets it when it's null. Unchanged values aren't written again. */
+	/** Stores a value, or removes it when null. */
 	void set(String key, Object value)
 	{
 		if (value == null)

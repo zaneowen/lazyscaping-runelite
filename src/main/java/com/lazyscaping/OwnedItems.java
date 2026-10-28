@@ -1,5 +1,6 @@
 package com.lazyscaping;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -15,35 +16,40 @@ import net.runelite.api.gameval.ItemID;
 import net.runelite.client.game.ItemManager;
 
 /**
- * The gear and coins the player owns: the bank as last seen (the client only
- * has it while it's open, so it's saved per account), plus what's worn and in
- * the inventory. Used on the client thread.
+ * Tracks the gear and coins the player owns. The bank is only available while
+ * it's open, so its contents are saved to the profile. Used on the client thread,
+ * except {@link #itemId}.
  */
 @Singleton
 class OwnedItems
 {
-	@Inject
-	private Client client;
+	private static final int PLATINUM_TOKEN_VALUE = 1000;
 
-	@Inject
-	private ItemManager itemManager;
+	private final Client client;
+	private final ItemManager itemManager;
+	private final ProfileSettings settings;
 
-	@Inject
-	private ProfileSettings settings;
-
-	private Set<Integer> bankIds = Set.of();
+	private Set<Integer> bankItemIds = Collections.emptySet();
 	private long bankCoins;
-	/** The bank's gear (gear id -> item id), matched once per bank change, not on every inventory change. */
+	/** Gear in the bank, by gear id, matched when the bank changes rather than on every inventory change. */
 	private Map<String, Integer> bankGear;
 	private GearCatalog bankGearCatalog;
-	/** The item id of each piece of gear owned, so pictures show your version. Read on the Swing thread. */
-	private volatile Map<String, Integer> itemIds = Map.of();
+	/** Item id of each piece of owned gear, by gear id. */
+	private volatile Map<String, Integer> ownedItemIds = Collections.emptyMap();
 
-	/** Reads the bank remembered for the logged-in account. */
+	@Inject
+	OwnedItems(Client client, ItemManager itemManager, ProfileSettings settings)
+	{
+		this.client = client;
+		this.itemManager = itemManager;
+		this.settings = settings;
+	}
+
+	/** Loads the bank saved for the current profile. */
 	void load()
 	{
-		String saved = settings.get(ProfileSettings.BANK_ITEMS);
 		Set<Integer> ids = new TreeSet<>();
+		String saved = settings.get(ProfileSettings.BANK_ITEMS);
 		if (saved != null && !saved.isEmpty())
 		{
 			for (String id : saved.split(","))
@@ -54,21 +60,17 @@ class OwnedItems
 				}
 				catch (NumberFormatException ignored)
 				{
+					// skip corrupt entries
 				}
 			}
 		}
-		bankIds = ids;
+		bankItemIds = ids;
 		bankCoins = settings.getLong(ProfileSettings.BANK_COINS, 0);
 		bankGear = null;
 	}
 
-	/** Remembers the bank's items and coins when it changes. */
-	void bankChanged(ItemContainer bank)
+	void onBankChanged(ItemContainer bank)
 	{
-		if (bank == null)
-		{
-			return;
-		}
 		Set<Integer> ids = new TreeSet<>();
 		for (Item item : bank.getItems())
 		{
@@ -77,9 +79,10 @@ class OwnedItems
 				ids.add(itemManager.canonicalize(item.getId()));
 			}
 		}
-		if (!ids.equals(bankIds))
+
+		if (!ids.equals(bankItemIds))
 		{
-			bankIds = ids;
+			bankItemIds = ids;
 			bankGear = null;
 			settings.set(ProfileSettings.BANK_ITEMS, ids.stream().map(String::valueOf).collect(Collectors.joining(",")));
 		}
@@ -87,79 +90,86 @@ class OwnedItems
 		settings.set(ProfileSettings.BANK_COINS, bankCoins);
 	}
 
-	/** Coins and platinum tokens in the bank (as last seen) and inventory, for the "My coins" budget. */
+	/** Coins and platinum tokens in the bank (as last seen) and inventory. */
 	long coins()
 	{
 		return bankCoins + coinsIn(client.getItemContainer(InventoryID.INV));
 	}
 
-	/** The site's gear ids for gear in the bank, worn or in the inventory. */
+	/** Gear ids of the gear in the bank, worn or in the inventory. */
 	Set<String> gear(GearCatalog catalog)
 	{
 		if (bankGear == null || bankGearCatalog != catalog)
 		{
-			bankGear = match(bankIds, catalog);
+			bankGear = matchGear(bankItemIds, catalog);
 			bankGearCatalog = catalog;
 		}
+
 		Set<Integer> carried = new TreeSet<>();
-		for (int containerId : new int[]{InventoryID.WORN, InventoryID.INV})
-		{
-			ItemContainer container = client.getItemContainer(containerId);
-			if (container != null)
-			{
-				for (Item item : container.getItems())
-				{
-					if (item.getId() > 0)
-					{
-						carried.add(itemManager.canonicalize(item.getId()));
-					}
-				}
-			}
-		}
-		Map<String, Integer> all = new HashMap<>(bankGear);
-		// What you're wearing or carrying shows over the bank's copy.
-		all.putAll(match(carried, catalog));
-		itemIds = all;
-		return new TreeSet<>(all.keySet());
+		addItemIds(carried, client.getItemContainer(InventoryID.WORN));
+		addItemIds(carried, client.getItemContainer(InventoryID.INV));
+
+		Map<String, Integer> owned = new HashMap<>(bankGear);
+		// prefer the copy being worn or carried, for its picture
+		owned.putAll(matchGear(carried, catalog));
+		ownedItemIds = owned;
+		return new TreeSet<>(owned.keySet());
 	}
 
-	/** The item id of a piece of owned gear, or null. Safe on any thread. */
+	/** The item id of a piece of owned gear, or null. Safe to call from any thread. */
 	Integer itemId(String gearId)
 	{
-		return itemIds.get(gearId);
+		return ownedItemIds.get(gearId);
 	}
 
-	private Map<String, Integer> match(Set<Integer> ids, GearCatalog catalog)
+	private void addItemIds(Set<Integer> ids, ItemContainer container)
 	{
-		Map<String, Integer> out = new HashMap<>();
-		for (int id : ids)
+		if (container == null)
 		{
-			String gear = catalog.match(itemManager.getItemComposition(id).getName());
-			if (gear != null)
+			return;
+		}
+		for (Item item : container.getItems())
+		{
+			if (item.getId() > 0)
 			{
-				out.put(gear, id);
+				ids.add(itemManager.canonicalize(item.getId()));
 			}
 		}
-		return out;
+	}
+
+	private Map<String, Integer> matchGear(Set<Integer> itemIds, GearCatalog catalog)
+	{
+		Map<String, Integer> gear = new HashMap<>();
+		for (int itemId : itemIds)
+		{
+			String gearId = catalog.match(itemManager.getItemComposition(itemId).getName());
+			if (gearId != null)
+			{
+				gear.put(gearId, itemId);
+			}
+		}
+		return gear;
 	}
 
 	private static long coinsIn(ItemContainer container)
 	{
-		long gp = 0;
-		if (container != null)
+		if (container == null)
 		{
-			for (Item item : container.getItems())
+			return 0;
+		}
+
+		long coins = 0;
+		for (Item item : container.getItems())
+		{
+			if (item.getId() == ItemID.COINS)
 			{
-				if (item.getId() == ItemID.COINS)
-				{
-					gp += item.getQuantity();
-				}
-				else if (item.getId() == ItemID.PLATINUM)
-				{
-					gp += item.getQuantity() * 1_000L;
-				}
+				coins += item.getQuantity();
+			}
+			else if (item.getId() == ItemID.PLATINUM)
+			{
+				coins += (long) item.getQuantity() * PLATINUM_TOKEN_VALUE;
 			}
 		}
-		return gp;
+		return coins;
 	}
 }

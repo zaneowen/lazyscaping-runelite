@@ -1,0 +1,218 @@
+package com.lazyscaping.ui;
+
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Cursor;
+import java.awt.Dimension;
+import java.awt.GridLayout;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import javax.swing.BoxLayout;
+import javax.swing.JButton;
+import javax.swing.JComponent;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.SwingConstants;
+import javax.swing.border.EmptyBorder;
+import net.runelite.client.ui.ColorScheme;
+import net.runelite.client.ui.FontManager;
+import net.runelite.client.ui.PluginPanel;
+
+/** Swing building blocks shared by the panel's views. */
+final class Components
+{
+	private static final int CARD_PADDING = 8;
+
+	/**
+	 * Width that text wraps at inside a card, in CSS pixels. Swing renders CSS
+	 * pixels at roughly 4/3 scale, hence the conversion.
+	 */
+	static final int TEXT_WIDTH = (PluginPanel.PANEL_WIDTH - 30 - 2 * CARD_PADDING) * 3 / 4;
+
+	/** The size of an inventory slot's sprite. */
+	static final Dimension ICON_SIZE = new Dimension(36, 32);
+
+	/** Width that text beside an item picture wraps at. */
+	static final int TEXT_BESIDE_ICON_WIDTH = TEXT_WIDTH - (ICON_SIZE.width + 6) * 3 / 4;
+
+	private Components()
+	{
+	}
+
+	/** A transparent panel that stacks its children vertically, left-aligned. */
+	static JPanel column()
+	{
+		JPanel panel = new JPanel()
+		{
+			@Override
+			protected void addImpl(Component comp, Object constraints, int index)
+			{
+				// BoxLayout misplaces children with mixed alignments
+				if (comp instanceof JComponent)
+				{
+					((JComponent) comp).setAlignmentX(LEFT_ALIGNMENT);
+				}
+				super.addImpl(comp, constraints, index);
+			}
+		};
+		panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+		panel.setOpaque(false);
+		return panel;
+	}
+
+	/** A shaded section with a bold title. */
+	static JPanel card(String title)
+	{
+		JPanel card = column();
+		card.setOpaque(true);
+		card.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+		card.setBorder(new EmptyBorder(CARD_PADDING, CARD_PADDING, CARD_PADDING, CARD_PADDING));
+
+		JLabel heading = new JLabel(title);
+		heading.setFont(FontManager.getRunescapeBoldFont());
+		heading.setForeground(Color.WHITE);
+		heading.setBorder(new EmptyBorder(0, 0, 6, 0));
+		card.add(heading);
+		return card;
+	}
+
+	static JComponent fullWidth(JComponent component)
+	{
+		JPanel row = new JPanel(new GridLayout(1, 1));
+		row.setOpaque(false);
+		row.setBorder(new EmptyBorder(2, 0, 2, 0));
+		row.add(component);
+		return row;
+	}
+
+	static JComponent gap(int height)
+	{
+		JPanel gap = new JPanel();
+		gap.setOpaque(false);
+		gap.setBorder(new EmptyBorder(height, 0, 0, 0));
+		gap.setMaximumSize(new Dimension(Integer.MAX_VALUE, height));
+		return gap;
+	}
+
+	static <T extends JComponent> T spaced(T component, int top)
+	{
+		component.setBorder(new EmptyBorder(top, 0, 0, 0));
+		return component;
+	}
+
+	static JLabel label(String html)
+	{
+		return label(html, TEXT_WIDTH);
+	}
+
+	/** A small-font label whose HTML wraps to {@code width}. Later {@link JLabel#setText} calls wrap too. */
+	static JLabel label(String html, int width)
+	{
+		JLabel label = new JLabel()
+		{
+			@Override
+			public void setText(String text)
+			{
+				super.setText(text == null || text.isEmpty() || text.startsWith("<html>") ? text : Html.wrap(text, width));
+			}
+		};
+		label.setFont(FontManager.getRunescapeSmallFont());
+		label.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+		label.setText(html);
+		return label;
+	}
+
+	static JLabel subheading(String text)
+	{
+		return spaced(label(Html.white(Html.escape(text))), 10);
+	}
+
+	static JButton button(String text)
+	{
+		return button(text, TEXT_WIDTH);
+	}
+
+	/** A button whose label wraps rather than being cut off. */
+	static JButton button(String text, int width)
+	{
+		// leave room for the button's own padding
+		return new JButton("<html><body style='width:" + (width - 15) + "px;text-align:center'>" + Html.escape(text) + "</body></html>");
+	}
+
+	/** Underlined text that runs {@code action} when clicked. */
+	static JLabel link(String text, Runnable action)
+	{
+		JLabel link = label(Html.color(Html.GOLD, Html.underline(Html.escape(text))));
+		onClick(link, action);
+		return link;
+	}
+
+	static void onClick(JComponent component, Runnable action)
+	{
+		component.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+		component.addMouseListener(new MouseAdapter()
+		{
+			@Override
+			public void mouseClicked(MouseEvent e)
+			{
+				action.run();
+			}
+		});
+	}
+
+	/** A clickable header that shows and hides {@code details}. */
+	static JComponent expandable(JComponent header, JComponent details)
+	{
+		JPanel panel = column();
+		details.setVisible(false);
+		header.setToolTipText("Click for details");
+		onClick(header, () ->
+		{
+			details.setVisible(!details.isVisible());
+			panel.revalidate();
+			panel.repaint();
+		});
+		panel.add(header);
+		panel.add(details);
+		return panel;
+	}
+
+	/** An empty label sized for an item picture. */
+	static JLabel picture()
+	{
+		JLabel picture = new JLabel();
+		picture.setPreferredSize(ICON_SIZE);
+		picture.setMinimumSize(ICON_SIZE);
+		picture.setHorizontalAlignment(SwingConstants.CENTER);
+		picture.setVerticalAlignment(SwingConstants.TOP);
+		return picture;
+	}
+
+	/** A picture with wrapped text beside it. */
+	static JPanel pictureRow(JLabel picture, String html)
+	{
+		JPanel row = new JPanel(new BorderLayout(6, 0));
+		row.setOpaque(false);
+		row.add(picture, BorderLayout.WEST);
+		row.add(label(html, TEXT_BESIDE_ICON_WIDTH), BorderLayout.CENTER);
+		return spaced(row, 4);
+	}
+
+	/** Replaces a list's contents with a plain-text message, or clears it when {@code message} is null. */
+	static void showMessage(JPanel list, String message)
+	{
+		list.removeAll();
+		if (message != null)
+		{
+			list.add(label(Html.escape(message)));
+		}
+		refresh(list);
+	}
+
+	static void refresh(JComponent component)
+	{
+		component.revalidate();
+		component.repaint();
+	}
+}
