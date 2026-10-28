@@ -1,7 +1,5 @@
 package com.lazyscaping;
 
-import java.util.EnumSet;
-import java.util.Set;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import net.runelite.client.config.Config;
@@ -58,18 +56,17 @@ public interface LazyScapingConfig extends Config
 	}
 
 	@ConfigSection(
-		name = "Your account",
-		description = "Things the plugin can't always see, used to plan your gear setups",
+		name = "Achievement diaries",
+		description = "Diaries that change your gear setups. They're also detected in game.",
 		position = 3
 	)
-	String accountSection = "account";
+	String diarySection = "diaries";
 
 	@ConfigItem(
 		keyName = "lumbridgeElite",
 		name = "Elite Lumbridge Diary",
-		description = "You've done the elite Lumbridge & Draynor Diary, so fairy rings don't need a dramen staff.<br>"
-			+ "It's also detected in game.",
-		section = accountSection,
+		description = "You've done the elite Lumbridge & Draynor Diary, so fairy rings don't need a dramen staff",
+		section = diarySection,
 		position = 4
 	)
 	default boolean lumbridgeElite()
@@ -77,16 +74,205 @@ public interface LazyScapingConfig extends Config
 		return false;
 	}
 
-	@ConfigItem(
-		keyName = "houseTeleports",
-		name = "House teleports",
-		description = "What your house has. Gear setups use a house teleport instead of the teleports these replace,<br>"
-			+ "and a fairy ring or spirit tree replaces a boss's teleport when it can get you there.",
-		section = accountSection,
-		position = 5
+	@ConfigSection(
+		name = "Your house",
+		description = "What your house has. Gear setups bring a house teleport instead of the teleports these replace.",
+		position = 10
 	)
-	default Set<HouseTeleport> houseTeleports()
+	String houseSection = "house";
+
+	@ConfigItem(
+		keyName = "houseFairyRing",
+		name = "Fairy ring",
+		description = "Your house has a fairy ring, used when one gets you to a boss",
+		section = houseSection,
+		position = 11
+	)
+	default boolean houseFairyRing()
 	{
-		return EnumSet.noneOf(HouseTeleport.class);
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "houseSpiritTree",
+		name = "Spirit tree",
+		description = "Your house has a spirit tree, used when one gets you to a boss",
+		section = houseSection,
+		position = 12
+	)
+	default boolean houseSpiritTree()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "houseXericsTalisman",
+		name = "Mounted Xeric's talisman",
+		description = "Your house has a mounted Xeric's talisman",
+		section = houseSection,
+		position = 13
+	)
+	default boolean houseXericsTalisman()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "houseDigsitePendant",
+		name = "Mounted digsite pendant",
+		description = "Your house has a mounted digsite pendant",
+		section = houseSection,
+		position = 14
+	)
+	default boolean houseDigsitePendant()
+	{
+		return false;
+	}
+
+	@ConfigSection(
+		name = "Jewellery box",
+		description = "The jewellery in your house's jewellery box",
+		position = 20
+	)
+	String jewellerySection = "jewelleryBox";
+
+	@ConfigItem(
+		keyName = "houseRingOfDueling",
+		name = "Ring of dueling",
+		description = "Your jewellery box has ring of dueling teleports",
+		section = jewellerySection,
+		position = 21
+	)
+	default boolean houseRingOfDueling()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "houseGamesNecklace",
+		name = "Games necklace",
+		description = "Your jewellery box has games necklace teleports",
+		section = jewellerySection,
+		position = 22
+	)
+	default boolean houseGamesNecklace()
+	{
+		return false;
+	}
+
+	@ConfigSection(
+		name = "House portals",
+		description = "The portals in your house's portal chamber or portal nexus",
+		position = 30,
+		closedByDefault = true
+	)
+	String portalSection = "portals";
+
+	@ConfigItem(
+		keyName = "houseVarrockPortal",
+		name = "Varrock",
+		description = "Your house has a Varrock portal",
+		section = portalSection,
+		position = 31
+	)
+	default boolean houseVarrockPortal()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "houseFaladorPortal",
+		name = "Falador",
+		description = "Your house has a Falador portal",
+		section = portalSection,
+		position = 32
+	)
+	default boolean houseFaladorPortal()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "houseBarrowsPortal",
+		name = "Barrows",
+		description = "Your house has a Barrows portal",
+		section = portalSection,
+		position = 33
+	)
+	default boolean houseBarrowsPortal()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "houseWaterbirthPortal",
+		name = "Waterbirth Island",
+		description = "Your house has a Waterbirth Island portal",
+		section = portalSection,
+		position = 34
+	)
+	default boolean houseWaterbirthPortal()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "houseTrollheimPortal",
+		name = "Trollheim",
+		description = "Your house has a Trollheim portal",
+		section = portalSection,
+		position = 35
+	)
+	default boolean houseTrollheimPortal()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "houseAnnakarlPortal",
+		name = "Annakarl",
+		description = "Your house has an Annakarl portal",
+		section = portalSection,
+		position = 36
+	)
+	default boolean houseAnnakarlPortal()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "houseCarrallangerPortal",
+		name = "Carrallanger",
+		description = "Your house has a Carrallanger portal",
+		section = portalSection,
+		position = 37
+	)
+	default boolean houseCarrallangerPortal()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "houseGhorrockPortal",
+		name = "Ghorrock",
+		description = "Your house has a Ghorrock portal",
+		section = portalSection,
+		position = 38
+	)
+	default boolean houseGhorrockPortal()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "houseLassarPortal",
+		name = "Lassar",
+		description = "Your house has a Lassar portal",
+		section = portalSection,
+		position = 39
+	)
+	default boolean houseLassarPortal()
+	{
+		return false;
 	}
 }

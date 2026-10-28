@@ -60,5 +60,6 @@ public class GearCatalogTest
 		assertEquals("toxic_blowpipe", bundled.match("Toxic blowpipe (empty)"));
 		assertEquals("slayer_helmet_i", bundled.match("Hydra slayer helmet (i)"));
 		assertTrue(bundled.getBosses().stream().anyMatch(b -> "vorkath".equals(b.getId()) && "Vorkath".equals(b.getName())));
+		assertTrue(bundled.getBosses().stream().allMatch(b -> bundled.getBossGroups().contains(b.getGroup())));
 	}
 }

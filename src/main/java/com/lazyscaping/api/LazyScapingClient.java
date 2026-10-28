@@ -32,7 +32,7 @@ public class LazyScapingClient
 
 	private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
 	/** Bumped when the catalog's shape changes, so cached copies of the old one aren't used. */
-	private static final String CATALOG_VERSION = "2";
+	private static final String CATALOG_VERSION = "3";
 
 	private final OkHttpClient http;
 	private final Gson gson;

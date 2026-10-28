@@ -18,7 +18,6 @@ import com.lazyscaping.ui.PanelActions;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.EnumMap;
-import java.util.EnumSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -160,9 +159,8 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 		catalog = GearCatalog.bundled(gson);
 		panel = new LazyScapingPanel(this, iconLoader);
 		panel.setLiveEnabled(config.liveRecommendations());
-		panel.setBossOptions(catalog.getBosses());
+		panel.setBossOptions(catalog.getBosses(), catalog.getBossGroups());
 		panel.setTaskOptions(catalog.getSlayerTasks());
-		panel.setHouseOptions(config.houseTeleports(), config.lumbridgeElite(), false);
 
 		navButton = NavigationButton.builder()
 			.tooltip("LazyScaping")
@@ -342,21 +340,21 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 				{
 					planLevel = -1;
 					fetchPlan();
-					gearPlans.values().forEach(this::fetchGearSetup);
+					fetchGearSetups();
 				});
 				break;
 			case "priority":
 				clientThread.invoke(this::fetchPlan);
 				break;
 			case "lumbridgeElite":
-			case "houseTeleports":
-				clientThread.invoke(() ->
-				{
-					updateHouseOptions();
-					gearPlans.values().forEach(this::fetchGearSetup);
-				});
+				clientThread.invoke(this::fetchGearSetups);
 				break;
 			default:
+				// the house tick boxes
+				if (event.getKey().startsWith("house"))
+				{
+					clientThread.invoke(this::fetchGearSetups);
+				}
 				break;
 		}
 	}
@@ -421,29 +419,6 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 	}
 
 	@Override
-	public void houseTeleportChanged(HouseTeleport teleport, boolean has)
-	{
-		Set<HouseTeleport> house = EnumSet.noneOf(HouseTeleport.class);
-		house.addAll(config.houseTeleports());
-		if (has)
-		{
-			house.add(teleport);
-		}
-		else
-		{
-			house.remove(teleport);
-		}
-		// saved like the settings panel saves it; the ConfigChanged event refreshes the setups
-		configManager.setConfiguration(LazyScapingConfig.GROUP, "houseTeleports", house);
-	}
-
-	@Override
-	public void lumbridgeEliteChanged(boolean done)
-	{
-		configManager.setConfiguration(LazyScapingConfig.GROUP, "lumbridgeElite", done);
-	}
-
-	@Override
 	public void slayerHelmetChanged(boolean planWithHelmet)
 	{
 		clientThread.invoke(() ->
@@ -481,7 +456,7 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 				gearBudget = budget;
 				saveIfLoggedIn(ProfileSettings.GEAR_BUDGET, budget);
 				updatePanel(p -> p.setGearBudget(budget));
-				gearPlans.values().forEach(this::fetchGearSetup);
+				fetchGearSetups();
 			}
 			else
 			{
@@ -521,7 +496,7 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 			planLevel = -1;
 			updateProgress();
 			fetchPlan();
-			gearPlans.values().forEach(this::fetchGearSetup);
+			fetchGearSetups();
 		});
 	}
 
@@ -612,13 +587,12 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 			p.setCoins(coins);
 			p.setSlayerHelmet(helmet);
 		});
-		updateHouseOptions();
 
 		planLevel = -1;
 		updateProgress();
 		updateSlayerTask();
 		fetchPlan();
-		gearPlans.values().forEach(this::fetchGearSetup);
+		fetchGearSetups();
 	}
 
 	private void selectGear(GearTarget target, String id, String settingKey)
@@ -631,14 +605,6 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 		fetchGearSetup(plan);
 	}
 
-	/** Shows the house teleport and diary settings, with the diary as detected in game when logged in. */
-	private void updateHouseOptions()
-	{
-		Set<HouseTeleport> house = config.houseTeleports();
-		boolean diaryTicked = config.lumbridgeElite();
-		boolean diaryDetected = playerName != null && account.hasLumbridgeElite();
-		updatePanel(p -> p.setHouseOptions(house, diaryTicked, diaryDetected));
-	}
 
 	private boolean ownsSlayerHelmet()
 	{
@@ -754,6 +720,11 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 		api.plan(body, plan -> updatePanel(p -> p.showPlan(plan)), error -> updatePanel(p -> p.showPlanMessage(error)));
 	}
 
+	private void fetchGearSetups()
+	{
+		gearPlans.values().forEach(this::fetchGearSetup);
+	}
+
 	private void fetchGearSetup(GearPlan plan)
 	{
 		plan.stale = false;
@@ -797,7 +768,7 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 		body.add("budget", budgetJson(gearBudget));
 		body.addProperty("lumbridgeElite", config.lumbridgeElite() || account.hasLumbridgeElite());
 		JsonArray house = new JsonArray();
-		config.houseTeleports().forEach(teleport -> house.add(teleport.getApiName()));
+		HouseTeleport.owned(config).forEach(teleport -> house.add(teleport.getApiName()));
 		body.add("house", house);
 
 		String requested = plan.selectedId;
@@ -832,7 +803,7 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 			// keep the bundled lists if the response predates them
 			if (!updated.getBosses().isEmpty())
 			{
-				updatePanel(p -> p.setBossOptions(updated.getBosses()));
+				updatePanel(p -> p.setBossOptions(updated.getBosses(), updated.getBossGroups()));
 			}
 			if (!updated.getSlayerTasks().isEmpty())
 			{

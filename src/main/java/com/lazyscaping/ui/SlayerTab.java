@@ -6,6 +6,7 @@ import com.lazyscaping.api.SlayerTask;
 import com.lazyscaping.api.SlayerTaskRef;
 import java.awt.BorderLayout;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import javax.swing.JCheckBox;
@@ -85,7 +86,9 @@ class SlayerTab extends JPanel
 		updating = true;
 		taskBox.removeAllItems();
 		taskBox.addItem(NO_TASK);
-		tasks.forEach(taskBox::addItem);
+		tasks.stream()
+			.sorted(Comparator.comparing(SlayerTaskRef::getName, String.CASE_INSENSITIVE_ORDER))
+			.forEach(taskBox::addItem);
 		updating = false;
 		selectTask(selected == null ? null : selected.getId());
 	}

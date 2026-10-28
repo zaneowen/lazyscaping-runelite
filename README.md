@@ -14,7 +14,7 @@ The side panel has three tabs.
 - **Training methods.** Every method for the skill, with what it needs. Click one for its details and guide, and *Use this method* to plan around it.
 
 **Bossing**
-- **Gear setup.** Pick a boss to see the best setup from the gear you own: each worn slot's item with its picture, what to get next and its GE price, the packed inventory with switches, the special attack weapon and supplies, and how to get there. With a budget, it also buys the best upgrades you can afford (not for ironmen).
+- **Gear setup.** Pick a boss, by name or narrowed to a type like *Slayer bosses* or *Raids*, to see the best setup from the gear you own: each worn slot's item with its picture, what to get next and its GE price, the packed inventory with switches, the special attack weapon and supplies, and how to get there. With a budget, it also buys the best upgrades you can afford (not for ironmen).
 
 **Slayer**
 - **Your task.** The task from RuneLite's Slayer plugin, with kills left, is picked automatically; you can also pick any task. It shows the requirements, where to kill them and tips.
@@ -22,7 +22,7 @@ The side panel has three tabs.
 
 **Show setup in bank.** Every gear setup can open a temporary *lazyscaping* bank tag with its items, laid out with the worn gear on top and the inventory as it's packed. If your bank is closed, it opens next time you open it.
 
-**Your house and diaries.** Under *Your house and diary* in the Bossing and Slayer tabs (or the plugin's settings), tick what your house has: a fairy ring, spirit tree, jewellery box, mounted Xeric's talisman or digsite pendant, or portals. Gear setups then take a house teleport instead of the teleports these replace, freeing inventory space. A fairy ring or spirit tree replaces a boss's teleport when it gets you there (a fairy ring only once it needs no dramen staff, or the setup carries one anyway). Once you've done the elite Lumbridge & Draynor Diary (detected in game, or tick *Elite Lumbridge Diary*), fairy ring routes no longer pack a dramen staff.
+**Your house and diaries.** In the plugin's settings, tick what your house has: a fairy ring, spirit tree, mounted Xeric's talisman or digsite pendant, the jewellery in your jewellery box (ring of dueling, games necklace) and your portals. Gear setups then take a house teleport instead of the teleports these replace, freeing inventory space. A fairy ring or spirit tree replaces a boss's teleport when it gets you there (a fairy ring only once it needs no dramen staff, or the setup carries one anyway). Once you've done the elite Lumbridge & Draynor Diary (detected in game, or tick *Elite Lumbridge Diary*), fairy ring routes no longer pack a dramen staff.
 
 **Budgets.** Each tab has a budget: a preset, an amount like `25m`, *Unlimited*, or *My coins* (the coins in your bank and inventory).
 
@@ -34,7 +34,7 @@ Goals, picked methods, bosses, Slayer tasks and budgets are saved per account.
 
 With *Live recommendations* off, the plugin makes no network requests. Sync only opens a link in your browser.
 
-With it on, the plugin sends your skill levels, the LazyScaping gear ids you own (matched on your computer against the site's gear list, never your full bank), your quest unlocks, your account type, your goal and picked method, your budgets and the boss or Slayer task you pick to lazyscaping.app. The site uses them to build the plan and gear setup and doesn't store them. Your RuneScape name isn't sent. Item pictures for untradeable items are loaded from lazyscaping.app.
+With it on, the plugin sends your skill levels, the LazyScaping gear ids you own (matched on your computer against the site's gear list, never your full bank), your quest unlocks, your account type, your goal and picked method, your budgets, the house teleports and diary you tick, and the boss or Slayer task you pick to lazyscaping.app. The site uses them to build the plan and gear setup and doesn't store them. Your RuneScape name isn't sent. Item pictures for untradeable items are loaded from lazyscaping.app.
 
 ## Development
 

@@ -35,12 +35,15 @@ class GearCatalog
 	@Getter
 	private final List<Boss> bosses;
 	@Getter
+	private final List<String> bossGroups;
+	@Getter
 	private final List<SlayerTaskRef> slayerTasks;
 
 	GearCatalog(Catalog catalog)
 	{
 		catalog.getGear().forEach((id, names) -> names.forEach(name -> gearByName.put(normalize(name), id)));
 		bosses = catalog.getBosses();
+		bossGroups = catalog.getBossGroups();
 		slayerTasks = catalog.getSlayerTasks();
 		for (SlayerTaskRef task : slayerTasks)
 		{

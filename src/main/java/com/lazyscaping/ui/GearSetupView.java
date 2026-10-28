@@ -1,13 +1,11 @@
 package com.lazyscaping.ui;
 
 import com.lazyscaping.Budget;
-import com.lazyscaping.HouseTeleport;
 import com.lazyscaping.api.GearSetup;
 import com.lazyscaping.api.GearSlot;
 import com.lazyscaping.api.GearSwitch;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
@@ -27,7 +25,6 @@ class GearSetupView
 	private final JComboBox<String> styleBox = new JComboBox<>();
 	private final JComponent styleRow = Components.labeledRow("Style", styleBox);
 	private final BudgetPicker budget;
-	private final HouseOptionsView houseOptions;
 	private final JButton bankButton = Components.button("Show setup in bank");
 	private final JLabel bankMessage = Components.label("");
 	private final JPanel setupPanel = Components.column();
@@ -40,7 +37,6 @@ class GearSetupView
 		this.actions = actions;
 		this.icons = icons;
 		budget = new BudgetPicker(Budget.GEAR_PRESETS, "Gp to spend on gear upgrades and supplies", b -> actions.budgetChanged(true, b));
-		houseOptions = new HouseOptionsView(actions);
 
 		styleBox.setToolTipText("Combat style");
 		styleBox.addActionListener(e ->
@@ -58,7 +54,6 @@ class GearSetupView
 
 		panel.add(styleRow);
 		panel.add(budget);
-		panel.add(houseOptions.getComponent());
 		panel.add(setupPanel);
 		panel.add(Components.spaced(Components.textButton("Open the full plan on lazyscaping.app", () -> actions.openGearPlan(target)), 10));
 		showMessage(null);
@@ -77,11 +72,6 @@ class GearSetupView
 	void setCoins(long coins)
 	{
 		budget.setCoins(coins);
-	}
-
-	void setHouseOptions(Set<HouseTeleport> house, boolean diaryTicked, boolean diaryDetected)
-	{
-		houseOptions.set(house, diaryTicked, diaryDetected);
 	}
 
 	/** Hides the style picker until the next setup arrives, since styles differ between bosses. */
