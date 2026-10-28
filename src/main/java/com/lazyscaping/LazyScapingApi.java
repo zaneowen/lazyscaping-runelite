@@ -108,6 +108,7 @@ class LazyScapingApi
 
 	static class GearSetup
 	{
+		GearCatalog.Boss boss;
 		String style;
 		List<String> styles;
 		/** Set when you can't bring your own gear, saying why. */
@@ -121,7 +122,8 @@ class LazyScapingApi
 
 	void catalog(Consumer<GearCatalog> done)
 	{
-		Request request = new Request.Builder().url(SITE.resolve("/api/plugin/catalog")).build();
+		// Versioned, so a cached copy from before the catalog changed shape isn't reused.
+		Request request = new Request.Builder().url(SITE.resolve("/api/plugin/catalog?v=2")).build();
 		send(request, JsonObject.class, json -> done.accept(GearCatalog.fromJson(gson, json)), error -> {});
 	}
 

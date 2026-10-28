@@ -540,7 +540,11 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 		api.catalog(c ->
 		{
 			catalog = c;
-			ui(() -> panel.setBossOptions(c.bosses()));
+			// An older catalog has no bosses; keep the bundled ones then.
+			if (!c.bosses().isEmpty())
+			{
+				ui(() -> panel.setBossOptions(c.bosses()));
+			}
 		});
 	}
 

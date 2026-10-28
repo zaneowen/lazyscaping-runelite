@@ -20,6 +20,7 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JProgressBar;
 import javax.swing.JSpinner;
+import javax.swing.ListCellRenderer;
 import javax.swing.SpinnerNumberModel;
 import javax.swing.border.EmptyBorder;
 import net.runelite.api.Skill;
@@ -64,6 +65,11 @@ class LazyScapingPanel extends PluginPanel
 	private static final Color READY = new Color(0x7bc96f);
 	private static final Color CLOSE = new Color(0xd9a23a);
 	private static final Color MISSING = new Color(0xe0605a);
+	/**
+	 * Width text wraps at, in CSS px: the panel minus its border and some slack. Swing's
+	 * HTML renderer draws CSS px about 4/3 larger, hence the scaling.
+	 */
+	private static final int WRAP_WIDTH = (PANEL_WIDTH - 30) * 3 / 4;
 	private static final NumberFormat NUMBER = NumberFormat.getIntegerInstance(Locale.ROOT);
 
 	private final Actions actions;
@@ -78,6 +84,8 @@ class LazyScapingPanel extends PluginPanel
 	private final JComboBox<GearCatalog.Boss> bossBox = new JComboBox<>();
 	private final JComboBox<String> styleBox = new JComboBox<>();
 	private final JPanel gearList = column();
+	/** Holds the style picker; shown when the boss can be fought more than one way. */
+	private final JComponent styleRow;
 	private final JLabel liveNotice = wrapped("Turn on <b>Live recommendations</b> in this plugin's settings to see your training plan, boss suggestions and gear setups here.");
 	/** Set while the goal controls are changed in code, so they don't report it as the player's choice. */
 	private boolean settingGoal;
@@ -98,7 +106,7 @@ class LazyScapingPanel extends PluginPanel
 		content.add(status);
 		content.add(gap());
 
-		JButton sync = new JButton("Open my planner on lazyscaping.app");
+		JButton sync = button("Open my planner on lazyscaping.app");
 		sync.setToolTipText("Opens the site with your name, gear and quests filled in");
 		sync.addActionListener(e -> actions.openTraining());
 		content.add(full(sync));
@@ -128,7 +136,7 @@ class LazyScapingPanel extends PluginPanel
 
 		content.add(heading("Bosses for you"));
 		content.add(bossList);
-		JButton bosses = new JButton("All boss suggestions");
+		JButton bosses = button("All boss suggestions");
 		bosses.addActionListener(e -> actions.openBosses());
 		content.add(full(bosses));
 		content.add(gap());
@@ -137,15 +145,27 @@ class LazyScapingPanel extends PluginPanel
 		bossBox.addItem(CHOOSE_BOSS);
 		// Sized like this, not by the longest boss name, so it fits the panel.
 		bossBox.setPrototypeDisplayValue(CHOOSE_BOSS);
+		// Long names wrap in the list instead of being cut off.
+		ListCellRenderer<? super GearCatalog.Boss> renderer = bossBox.getRenderer();
+		bossBox.setRenderer((list, boss, index, selected, focused) ->
+		{
+			Component c = renderer.getListCellRendererComponent(list, boss, index, selected, focused);
+			if (index >= 0 && boss != null && c instanceof JLabel)
+			{
+				((JLabel) c).setText(html(escape(boss.name)));
+			}
+			return c;
+		});
+		bossBox.setMaximumRowCount(15);
 		bossBox.addActionListener(e -> bossEdited(false));
 		styleBox.addActionListener(e -> bossEdited(true));
-		styleBox.setVisible(false);
-		JPanel bossRow = new JPanel(new BorderLayout(6, 0));
-		bossRow.add(bossBox, BorderLayout.CENTER);
-		bossRow.add(styleBox, BorderLayout.EAST);
-		content.add(full(bossRow));
+		styleBox.setToolTipText("Combat style");
+		content.add(full(bossBox));
+		styleRow = full(styleBox);
+		styleRow.setVisible(false);
+		content.add(styleRow);
 		content.add(gearList);
-		JButton fullPlan = new JButton("Full gear plan on lazyscaping.app");
+		JButton fullPlan = button("Full gear plan on lazyscaping.app");
 		fullPlan.addActionListener(e ->
 		{
 			GearCatalog.Boss boss = (GearCatalog.Boss) bossBox.getSelectedItem();
@@ -214,7 +234,7 @@ class LazyScapingPanel extends PluginPanel
 				bossBox.setSelectedIndex(i);
 			}
 		}
-		styleBox.setVisible(false);
+		styleRow.setVisible(false);
 		settingBoss = false;
 	}
 
@@ -228,7 +248,7 @@ class LazyScapingPanel extends PluginPanel
 		String bossId = boss == null ? null : boss.id;
 		if (!styleChanged)
 		{
-			styleBox.setVisible(false);
+			styleRow.setVisible(false);
 		}
 		actions.bossSelected(bossId, styleChanged ? (String) styleBox.getSelectedItem() : null);
 	}
@@ -357,7 +377,7 @@ class LazyScapingPanel extends PluginPanel
 			setup.styles.forEach(styleBox::addItem);
 		}
 		styleBox.setSelectedItem(setup.style);
-		styleBox.setVisible(setup.styles != null && setup.styles.size() > 1);
+		styleRow.setVisible(setup.styles != null && setup.styles.size() > 1);
 		settingBoss = false;
 
 		gearList.removeAll();
@@ -367,7 +387,8 @@ class LazyScapingPanel extends PluginPanel
 		}
 		else
 		{
-			gearList.add(small("From the gear you own · " + escape(setup.style)));
+			String name = setup.boss != null ? setup.boss.name : "";
+			gearList.add(wrapped("<font color='#ffffff'>" + escape(name) + "</font><br>" + escape(setup.style) + " · from the gear you own"));
 			addSlots(setup.picks);
 			if (setup.switches != null)
 			{
@@ -585,21 +606,31 @@ class LazyScapingPanel extends PluginPanel
 
 	private static JLabel small(String text)
 	{
-		JLabel label = new JLabel(text);
-		label.setFont(FontManager.getRunescapeSmallFont());
-		label.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
-		return label;
+		return wrapped(text);
+	}
+
+	/** Text (which may contain HTML) wrapped to fit the panel, leaving room for the border and scrollbar. */
+	private static String html(String text)
+	{
+		return "<html><body style='width:" + WRAP_WIDTH + "px'>" + text + "</body></html>";
+	}
+
+	/** A button whose label wraps instead of being cut off. */
+	private static JButton button(String text)
+	{
+		// Narrower than other text, to leave room for the button's padding.
+		return new JButton("<html><body style='width:" + (WRAP_WIDTH - 25) + "px;text-align:center'>" + escape(text) + "</body></html>");
 	}
 
 	/** A label whose text wraps to the panel's width. Text may contain HTML. */
-	private static JLabel wrapped(String html)
+	private static JLabel wrapped(String text)
 	{
-		JLabel label = new JLabel("<html><body style='width:" + (PANEL_WIDTH - 40) + "px'>" + html + "</body></html>")
+		JLabel label = new JLabel(html(text))
 		{
 			@Override
 			public void setText(String text)
 			{
-				super.setText(text.startsWith("<html>") || text.isEmpty() ? text : "<html><body style='width:" + (PANEL_WIDTH - 40) + "px'>" + text + "</body></html>");
+				super.setText(text == null || text.isEmpty() || text.startsWith("<html>") ? text : html(text));
 			}
 		};
 		label.setFont(FontManager.getRunescapeSmallFont());
