@@ -62,6 +62,7 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 	private static final String GOAL_SKILL_KEY = "goalSkill";
 	private static final String GOAL_LEVEL_KEY = "goalLevel";
 	private static final String GOAL_FROM_KEY = "goalFromXp";
+	private static final String GEAR_BOSS_KEY = "gearBoss";
 
 	/** Skills with levels. Overall is deprecated in the API, so it's left out by name. */
 	static final List<Skill> SKILLS = Arrays.stream(Skill.values())
@@ -136,6 +137,9 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 	/** The goal skill's level when the plan was fetched, so a level-up fetches it again. */
 	private int planLevel = -1;
 	private final Map<Skill, Integer> knownLevels = new EnumMap<>(Skill.class);
+	/** The boss picked for the gear setup, and the style picked for it (null: the best for your gear). */
+	private String gearBoss;
+	private String gearStyle;
 	/** The gear the boss suggestions were fetched with. */
 	private Set<String> bossGear = Set.of();
 	private boolean bossesStale;
@@ -160,9 +164,10 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 			.build();
 		clientToolbar.addNavigation(navButton);
 		panel.setLiveEnabled(config.liveRecommendations());
+		panel.setBossOptions(catalog.bosses());
 		if (config.liveRecommendations())
 		{
-			api.catalog(c -> catalog = c);
+			fetchCatalog();
 		}
 		clientThread.invoke(() -> loadPending = client.getGameState() == GameState.LOGGED_IN);
 	}
@@ -276,7 +281,7 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 			ui(() -> panel.setLiveEnabled(live));
 			if (live)
 			{
-				api.catalog(c -> catalog = c);
+				fetchCatalog();
 			}
 			clientThread.invoke(() ->
 			{
@@ -352,6 +357,28 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 	}
 
 	@Override
+	public void bossSelected(String bossId, String style)
+	{
+		clientThread.invoke(() ->
+		{
+			gearBoss = bossId;
+			gearStyle = style;
+			if (player != null)
+			{
+				if (bossId == null)
+				{
+					configManager.unsetRSProfileConfiguration(LazyScapingConfig.GROUP, GEAR_BOSS_KEY);
+				}
+				else
+				{
+					configManager.setRSProfileConfiguration(LazyScapingConfig.GROUP, GEAR_BOSS_KEY, bossId);
+				}
+			}
+			fetchGear();
+		});
+	}
+
+	@Override
 	public void refresh()
 	{
 		clientThread.invoke(() ->
@@ -380,12 +407,17 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 		goalLevel = parseInt(configManager.getRSProfileConfiguration(LazyScapingConfig.GROUP, GOAL_LEVEL_KEY), 99);
 		goalFromXp = parseInt(configManager.getRSProfileConfiguration(LazyScapingConfig.GROUP, GOAL_FROM_KEY), 0);
 
+		gearBoss = configManager.getRSProfileConfiguration(LazyScapingConfig.GROUP, GEAR_BOSS_KEY);
+		gearStyle = null;
+
 		Skill skill = goalSkill;
 		int level = goalLevel;
+		String boss = gearBoss;
 		ui(() ->
 		{
 			panel.setLoggedIn(true);
 			panel.setGoal(skill, level);
+			panel.selectBoss(boss);
 		});
 		planLevel = -1;
 		bossGear = Set.of();
@@ -473,6 +505,43 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 
 		ui(() -> panel.showBossesMessage("Finding bosses..."));
 		api.bosses(body, bosses -> ui(() -> panel.showBosses(bosses)), error -> ui(() -> panel.showBossesMessage(error)));
+		// The gear setup depends on the same levels and gear.
+		fetchGear();
+	}
+
+	private void fetchGear()
+	{
+		if (gearBoss == null)
+		{
+			ui(() -> panel.showGearMessage(null));
+			return;
+		}
+		if (player == null || !config.liveRecommendations())
+		{
+			return;
+		}
+		JsonObject body = new JsonObject();
+		body.addProperty("boss", gearBoss);
+		if (gearStyle != null)
+		{
+			body.addProperty("style", gearStyle);
+		}
+		body.add("levels", levels());
+		body.add("owned", gson.toJsonTree(bossGear));
+		body.addProperty("members", members());
+
+		ui(() -> panel.showGearMessage("Building your setup..."));
+		api.gear(body, setup -> ui(() -> panel.showGear(setup)), error -> ui(() -> panel.showGearMessage(error)));
+	}
+
+	/** The site's current gear list and bosses, in place of the bundled copy. */
+	private void fetchCatalog()
+	{
+		api.catalog(c ->
+		{
+			catalog = c;
+			ui(() -> panel.setBossOptions(c.bosses()));
+		});
 	}
 
 	/**

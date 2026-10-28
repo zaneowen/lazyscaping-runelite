@@ -14,7 +14,7 @@ public class GearCatalogTest
 		"trident_of_the_seas", List.of("trident of the seas", "uncharged trident"),
 		"osmumtens_fang", List.of("osmumten's fang"),
 		"ahrims_robetop", List.of("ahrim's robetop")
-	));
+	), List.of());
 
 	@Test
 	public void matchesNamesAndAliases()
@@ -45,5 +45,6 @@ public class GearCatalogTest
 		GearCatalog bundled = GearCatalog.bundled(new Gson());
 		assertEquals("abyssal_whip", bundled.match("Abyssal whip"));
 		assertEquals("toxic_blowpipe", bundled.match("Toxic blowpipe (empty)"));
+		assertEquals(true, bundled.bosses().stream().anyMatch(b -> "vorkath".equals(b.id) && "Vorkath".equals(b.name)));
 	}
 }

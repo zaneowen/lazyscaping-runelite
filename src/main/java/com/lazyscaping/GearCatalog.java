@@ -34,21 +34,48 @@ class GearCatalog
 
 	/** Normalized name -> gear id. */
 	private final Map<String, String> byName = new HashMap<>();
+	private final List<Boss> bosses;
+
+	/** A boss the site has gear plans for. */
+	static class Boss
+	{
+		final String id;
+		final String name;
+
+		Boss(String id, String name)
+		{
+			this.id = id;
+			this.name = name;
+		}
+
+		@Override
+		public String toString()
+		{
+			return name;
+		}
+	}
 
 	private static class Response
 	{
 		Map<String, List<String>> gear;
+		List<Boss> bosses;
 	}
 
-	GearCatalog(Map<String, List<String>> gear)
+	GearCatalog(Map<String, List<String>> gear, List<Boss> bosses)
 	{
 		gear.forEach((id, names) -> names.forEach(name -> byName.put(normalize(name), id)));
+		this.bosses = bosses;
 	}
 
 	static GearCatalog fromJson(Gson gson, JsonObject json)
 	{
 		Response response = gson.fromJson(json, Response.class);
-		return new GearCatalog(response.gear == null ? Map.of() : response.gear);
+		return new GearCatalog(response.gear == null ? Map.of() : response.gear, response.bosses == null ? List.of() : response.bosses);
+	}
+
+	List<Boss> bosses()
+	{
+		return bosses;
 	}
 
 	/** The copy bundled with the plugin, or an empty catalog if it can't be read. */
@@ -62,7 +89,7 @@ class GearCatalog
 		catch (Exception e)
 		{
 			log.warn("Couldn't read the bundled gear catalog", e);
-			return new GearCatalog(Map.of());
+			return new GearCatalog(Map.of(), List.of());
 		}
 	}
 

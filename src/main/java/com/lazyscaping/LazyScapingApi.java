@@ -80,6 +80,45 @@ class LazyScapingApi
 		List<BossSuggestion> bosses;
 	}
 
+	static class GearSlot
+	{
+		String slot;
+		/** The best item you own for the slot, or null. */
+		String item;
+		/** "owned", "none" or "twoHanded" (the weapon takes this slot). */
+		String status;
+		/** The next item to work towards. */
+		String next;
+		/** The boss needs a specific item here, like an anti-dragon shield. */
+		boolean missingRequired;
+	}
+
+	static class GearSwitch
+	{
+		String style;
+		List<GearSlot> picks;
+	}
+
+	static class ItemLine
+	{
+		String name;
+		int qty;
+		String why;
+	}
+
+	static class GearSetup
+	{
+		String style;
+		List<String> styles;
+		/** Set when you can't bring your own gear, saying why. */
+		String noGear;
+		List<GearSlot> picks;
+		List<GearSwitch> switches;
+		GearSlot spec;
+		List<ItemLine> supplies;
+		List<ItemLine> utility;
+	}
+
 	void catalog(Consumer<GearCatalog> done)
 	{
 		Request request = new Request.Builder().url(SITE.resolve("/api/plugin/catalog")).build();
@@ -94,6 +133,11 @@ class LazyScapingApi
 	void bosses(JsonObject body, Consumer<Bosses> done, Consumer<String> failed)
 	{
 		send(post("/api/plugin/bosses", body), Bosses.class, done, failed);
+	}
+
+	void gear(JsonObject body, Consumer<GearSetup> done, Consumer<String> failed)
+	{
+		send(post("/api/plugin/gear", body), GearSetup.class, done, failed);
 	}
 
 	private Request post(String path, JsonObject body)

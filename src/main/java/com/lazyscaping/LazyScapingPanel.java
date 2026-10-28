@@ -8,7 +8,9 @@ import java.awt.GridLayout;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.text.NumberFormat;
+import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
@@ -39,6 +41,9 @@ class LazyScapingPanel extends PluginPanel
 
 		void openBoss(String bossId);
 
+		/** The player picked a boss for the gear setup (null to clear it), and maybe a style. */
+		void bossSelected(String bossId, String style);
+
 		void refresh();
 	}
 
@@ -55,8 +60,10 @@ class LazyScapingPanel extends PluginPanel
 	}
 
 	private static final String CHOOSE_SKILL = "Choose a skill";
+	private static final GearCatalog.Boss CHOOSE_BOSS = new GearCatalog.Boss(null, "Choose a boss");
 	private static final Color READY = new Color(0x7bc96f);
 	private static final Color CLOSE = new Color(0xd9a23a);
+	private static final Color MISSING = new Color(0xe0605a);
 	private static final NumberFormat NUMBER = NumberFormat.getIntegerInstance(Locale.ROOT);
 
 	private final Actions actions;
@@ -68,9 +75,14 @@ class LazyScapingPanel extends PluginPanel
 	private final JLabel rate = small("");
 	private final JPanel planList = column();
 	private final JPanel bossList = column();
-	private final JLabel liveNotice = wrapped("Turn on <b>Live recommendations</b> in this plugin's settings to see your training plan and boss suggestions here.");
+	private final JComboBox<GearCatalog.Boss> bossBox = new JComboBox<>();
+	private final JComboBox<String> styleBox = new JComboBox<>();
+	private final JPanel gearList = column();
+	private final JLabel liveNotice = wrapped("Turn on <b>Live recommendations</b> in this plugin's settings to see your training plan, boss suggestions and gear setups here.");
 	/** Set while the goal controls are changed in code, so they don't report it as the player's choice. */
 	private boolean settingGoal;
+	/** The same for the gear setup's boss and style pickers. */
+	private boolean settingBoss;
 
 	LazyScapingPanel(Actions actions)
 	{
@@ -121,6 +133,30 @@ class LazyScapingPanel extends PluginPanel
 		content.add(full(bosses));
 		content.add(gap());
 
+		content.add(heading("Gear setup"));
+		bossBox.addItem(CHOOSE_BOSS);
+		// Sized like this, not by the longest boss name, so it fits the panel.
+		bossBox.setPrototypeDisplayValue(CHOOSE_BOSS);
+		bossBox.addActionListener(e -> bossEdited(false));
+		styleBox.addActionListener(e -> bossEdited(true));
+		styleBox.setVisible(false);
+		JPanel bossRow = new JPanel(new BorderLayout(6, 0));
+		bossRow.add(bossBox, BorderLayout.CENTER);
+		bossRow.add(styleBox, BorderLayout.EAST);
+		content.add(full(bossRow));
+		content.add(gearList);
+		JButton fullPlan = new JButton("Full gear plan on lazyscaping.app");
+		fullPlan.addActionListener(e ->
+		{
+			GearCatalog.Boss boss = (GearCatalog.Boss) bossBox.getSelectedItem();
+			if (boss != null && boss.id != null)
+			{
+				actions.openBoss(boss.id);
+			}
+		});
+		content.add(full(fullPlan));
+		content.add(gap());
+
 		content.add(liveNotice);
 		JButton refresh = new JButton("Refresh");
 		refresh.addActionListener(e -> actions.refresh());
@@ -139,6 +175,7 @@ class LazyScapingPanel extends PluginPanel
 			showProgress(null);
 			showPlanMessage(null);
 			showBossesMessage(null);
+			showGearMessage(null);
 		}
 	}
 
@@ -149,7 +186,51 @@ class LazyScapingPanel extends PluginPanel
 		{
 			showPlanMessage(null);
 			showBossesMessage(null);
+			showGearMessage(null);
 		}
+	}
+
+	/** The bosses the gear setup can be picked for, keeping the current pick. */
+	void setBossOptions(List<GearCatalog.Boss> bosses)
+	{
+		GearCatalog.Boss selected = (GearCatalog.Boss) bossBox.getSelectedItem();
+		settingBoss = true;
+		bossBox.removeAllItems();
+		bossBox.addItem(CHOOSE_BOSS);
+		bosses.forEach(bossBox::addItem);
+		settingBoss = false;
+		selectBoss(selected == null ? null : selected.id);
+	}
+
+	/** Shows a boss in the gear setup picker without reporting it back as a change. */
+	void selectBoss(String bossId)
+	{
+		settingBoss = true;
+		bossBox.setSelectedItem(CHOOSE_BOSS);
+		for (int i = 0; i < bossBox.getItemCount(); i++)
+		{
+			if (Objects.equals(bossBox.getItemAt(i).id, bossId))
+			{
+				bossBox.setSelectedIndex(i);
+			}
+		}
+		styleBox.setVisible(false);
+		settingBoss = false;
+	}
+
+	private void bossEdited(boolean styleChanged)
+	{
+		if (settingBoss)
+		{
+			return;
+		}
+		GearCatalog.Boss boss = (GearCatalog.Boss) bossBox.getSelectedItem();
+		String bossId = boss == null ? null : boss.id;
+		if (!styleChanged)
+		{
+			styleBox.setVisible(false);
+		}
+		actions.bossSelected(bossId, styleChanged ? (String) styleBox.getSelectedItem() : null);
 	}
 
 	/** Shows a goal without reporting it back as a change. */
@@ -267,6 +348,124 @@ class LazyScapingPanel extends PluginPanel
 		refreshLayout(bossList);
 	}
 
+	void showGear(LazyScapingApi.GearSetup setup)
+	{
+		settingBoss = true;
+		styleBox.removeAllItems();
+		if (setup.styles != null)
+		{
+			setup.styles.forEach(styleBox::addItem);
+		}
+		styleBox.setSelectedItem(setup.style);
+		styleBox.setVisible(setup.styles != null && setup.styles.size() > 1);
+		settingBoss = false;
+
+		gearList.removeAll();
+		if (setup.noGear != null)
+		{
+			gearList.add(wrapped(escape(setup.noGear)));
+		}
+		else
+		{
+			gearList.add(small("From the gear you own · " + escape(setup.style)));
+			addSlots(setup.picks);
+			if (setup.switches != null)
+			{
+				for (LazyScapingApi.GearSwitch sw : setup.switches)
+				{
+					gearList.add(subheading(sw.style + " switch"));
+					addSlots(sw.picks);
+				}
+			}
+			if (setup.spec != null)
+			{
+				gearList.add(subheading("Special attack"));
+				addSlots(List.of(setup.spec));
+			}
+		}
+		if (setup.supplies != null && !setup.supplies.isEmpty())
+		{
+			gearList.add(subheading("Inventory"));
+			gearList.add(wrapped(lines(setup.supplies)));
+		}
+		if (setup.utility != null && !setup.utility.isEmpty())
+		{
+			gearList.add(subheading("Also bring"));
+			JLabel utility = wrapped(lines(setup.utility));
+			StringBuilder why = new StringBuilder("<html>");
+			for (LazyScapingApi.ItemLine line : setup.utility)
+			{
+				why.append("<b>").append(escape(line.name)).append(":</b> ").append(escape(line.why)).append("<br>");
+			}
+			utility.setToolTipText(why.append("</html>").toString());
+			gearList.add(utility);
+		}
+		refreshLayout(gearList);
+	}
+
+	void showGearMessage(String message)
+	{
+		gearList.removeAll();
+		if (message != null)
+		{
+			gearList.add(small(message));
+		}
+		refreshLayout(gearList);
+	}
+
+	private void addSlots(List<LazyScapingApi.GearSlot> slots)
+	{
+		if (slots == null)
+		{
+			return;
+		}
+		for (LazyScapingApi.GearSlot s : slots)
+		{
+			StringBuilder html = new StringBuilder("<font color='#a8a29e'>").append(escape(s.slot)).append(":</font> ");
+			if ("twoHanded".equals(s.status))
+			{
+				html.append("<font color='#a8a29e'>two-handed weapon</font>");
+			}
+			else if (s.item != null)
+			{
+				html.append("<font color='").append(hex(READY)).append("'>").append(escape(s.item)).append("</font>");
+				if (s.next != null)
+				{
+					html.append("<br><font color='#a8a29e'>upgrade: ").append(escape(s.next)).append("</font>");
+				}
+			}
+			else
+			{
+				html.append(s.missingRequired ? "<font color='" + hex(MISSING) + "'>needed</font>" : "<font color='#a8a29e'>empty</font>");
+				if (s.next != null)
+				{
+					html.append(" · get <font color='").append(hex(CLOSE)).append("'>").append(escape(s.next)).append("</font>");
+				}
+			}
+			JLabel label = wrapped(html.toString());
+			label.setBorder(new EmptyBorder(1, 0, 1, 0));
+			gearList.add(label);
+		}
+	}
+
+	private static String lines(List<LazyScapingApi.ItemLine> lines)
+	{
+		StringBuilder out = new StringBuilder();
+		for (LazyScapingApi.ItemLine line : lines)
+		{
+			if (out.length() > 0)
+			{
+				out.append(", ");
+			}
+			if (line.qty > 1)
+			{
+				out.append(line.qty).append(' ');
+			}
+			out.append(escape(line.name));
+		}
+		return out.toString();
+	}
+
 	private JComponent bossRow(LazyScapingApi.BossSuggestion boss)
 	{
 		boolean ready = "ready".equals(boss.readiness);
@@ -285,14 +484,15 @@ class LazyScapingPanel extends PluginPanel
 		JLabel label = wrapped("<font color='" + hex(ready ? READY : CLOSE) + "'>" + escape(boss.name) + "</font>"
 			+ "<br><font color='#a8a29e'>" + detail + "</font>");
 		label.setBorder(new EmptyBorder(3, 0, 3, 0));
-		label.setToolTipText("Open the gear plan for " + boss.name);
+		label.setToolTipText("Show your gear setup for " + boss.name);
 		label.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 		label.addMouseListener(new MouseAdapter()
 		{
 			@Override
 			public void mouseClicked(MouseEvent e)
 			{
-				actions.openBoss(boss.id);
+				selectBoss(boss.id);
+				actions.bossSelected(boss.id, null);
 			}
 		});
 		return label;
@@ -371,6 +571,15 @@ class LazyScapingPanel extends PluginPanel
 		label.setFont(FontManager.getRunescapeBoldFont());
 		label.setForeground(Color.WHITE);
 		label.setBorder(BorderFactory.createEmptyBorder(0, 0, 4, 0));
+		return label;
+	}
+
+	private static JLabel subheading(String text)
+	{
+		JLabel label = new JLabel(text);
+		label.setFont(FontManager.getRunescapeSmallFont());
+		label.setForeground(Color.WHITE);
+		label.setBorder(new EmptyBorder(6, 0, 1, 0));
 		return label;
 	}
 
