@@ -1,5 +1,6 @@
 package com.lazyscaping.ui;
 
+import com.lazyscaping.HouseTeleport;
 import net.runelite.api.Skill;
 
 /** What the player does in the panel. Called on the Swing thread. */
@@ -19,6 +20,12 @@ public interface PanelActions
 
 	/** The player said whether to plan Slayer gear with a Slayer helmet (i). */
 	void slayerHelmetChanged(boolean planWithHelmet);
+
+	/** A house teleport was ticked or unticked. */
+	void houseTeleportChanged(HouseTeleport teleport, boolean has);
+
+	/** The elite Lumbridge Diary box was ticked or unticked. */
+	void lumbridgeEliteChanged(boolean done);
 
 	/** A combat style was picked for a setup. */
 	void styleSelected(GearTarget target, String style);

@@ -18,6 +18,7 @@ import com.lazyscaping.ui.PanelActions;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -93,6 +94,9 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 	private LazyScapingConfig config;
 
 	@Inject
+	private ConfigManager configManager;
+
+	@Inject
 	private LazyScapingClient api;
 
 	@Inject
@@ -158,6 +162,7 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 		panel.setLiveEnabled(config.liveRecommendations());
 		panel.setBossOptions(catalog.getBosses());
 		panel.setTaskOptions(catalog.getSlayerTasks());
+		panel.setHouseOptions(config.houseTeleports(), config.lumbridgeElite(), false);
 
 		navButton = NavigationButton.builder()
 			.tooltip("LazyScaping")
@@ -345,7 +350,11 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 				break;
 			case "lumbridgeElite":
 			case "houseTeleports":
-				clientThread.invoke(() -> gearPlans.values().forEach(this::fetchGearSetup));
+				clientThread.invoke(() ->
+				{
+					updateHouseOptions();
+					gearPlans.values().forEach(this::fetchGearSetup);
+				});
 				break;
 			default:
 				break;
@@ -409,6 +418,29 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 	public void taskSelected(String taskId)
 	{
 		clientThread.invoke(() -> selectGear(GearTarget.SLAYER, taskId, ProfileSettings.SLAYER_TASK));
+	}
+
+	@Override
+	public void houseTeleportChanged(HouseTeleport teleport, boolean has)
+	{
+		Set<HouseTeleport> house = EnumSet.noneOf(HouseTeleport.class);
+		house.addAll(config.houseTeleports());
+		if (has)
+		{
+			house.add(teleport);
+		}
+		else
+		{
+			house.remove(teleport);
+		}
+		// saved like the settings panel saves it; the ConfigChanged event refreshes the setups
+		configManager.setConfiguration(LazyScapingConfig.GROUP, "houseTeleports", house);
+	}
+
+	@Override
+	public void lumbridgeEliteChanged(boolean done)
+	{
+		configManager.setConfiguration(LazyScapingConfig.GROUP, "lumbridgeElite", done);
 	}
 
 	@Override
@@ -580,6 +612,7 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 			p.setCoins(coins);
 			p.setSlayerHelmet(helmet);
 		});
+		updateHouseOptions();
 
 		planLevel = -1;
 		updateProgress();
@@ -596,6 +629,15 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 		saveIfLoggedIn(settingKey, id);
 		updatePanel(p -> p.showBankMessage(target, null));
 		fetchGearSetup(plan);
+	}
+
+	/** Shows the house teleport and diary settings, with the diary as detected in game when logged in. */
+	private void updateHouseOptions()
+	{
+		Set<HouseTeleport> house = config.houseTeleports();
+		boolean diaryTicked = config.lumbridgeElite();
+		boolean diaryDetected = playerName != null && account.hasLumbridgeElite();
+		updatePanel(p -> p.setHouseOptions(house, diaryTicked, diaryDetected));
 	}
 
 	private boolean ownsSlayerHelmet()

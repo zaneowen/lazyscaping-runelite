@@ -1,5 +1,6 @@
 package com.lazyscaping.ui;
 
+import com.lazyscaping.HouseTeleport;
 import com.lazyscaping.api.Boss;
 import com.lazyscaping.api.GearSetup;
 import com.lazyscaping.api.Plan;
@@ -7,6 +8,7 @@ import com.lazyscaping.api.SlayerTaskRef;
 import java.awt.BorderLayout;
 import java.awt.GridLayout;
 import java.util.List;
+import java.util.Set;
 import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -128,6 +130,13 @@ public class LazyScapingPanel extends PluginPanel
 	{
 		setup(GearTarget.BOSS).setBudget(budget);
 		setup(GearTarget.SLAYER).setBudget(budget);
+	}
+
+	/** Shows what the player's house has and whether their elite Lumbridge Diary is done, in both gear tabs. */
+	public void setHouseOptions(Set<HouseTeleport> house, boolean diaryTicked, boolean diaryDetected)
+	{
+		setup(GearTarget.BOSS).setHouseOptions(house, diaryTicked, diaryDetected);
+		setup(GearTarget.SLAYER).setHouseOptions(house, diaryTicked, diaryDetected);
 	}
 
 	public void setCoins(long coins)
