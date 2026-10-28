@@ -1,11 +1,17 @@
 package com.lazyscaping;
 
 import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.awt.GridLayout;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
@@ -13,6 +19,7 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.ListCellRenderer;
 import javax.swing.SwingConstants;
+import net.runelite.client.ui.ColorScheme;
 
 /** The Bossing tab: pick a boss to see the best gear setup from what you own, and what a budget buys. */
 class BossingTab extends JPanel
@@ -22,6 +29,10 @@ class BossingTab extends JPanel
 	private static final Dimension ICON_SIZE = new Dimension(36, 32);
 	/** Text next to an item picture wraps narrower. */
 	private static final int ICON_TEXT_WIDTH = Ui.WRAP_WIDTH - (ICON_SIZE.width + 6) * 3 / 4;
+	/** The inventory is 4 slots wide, like the game's. */
+	private static final int INVENTORY_COLUMNS = 4;
+	/** An inventory slot: an item picture plus a 1px border each side. */
+	private static final Dimension CELL_SIZE = new Dimension(ICON_SIZE.width + 2, ICON_SIZE.height + 2);
 
 	private final LazyScapingPanel.Actions actions;
 	private final LazyScapingPanel.Icons icons;
@@ -175,33 +186,158 @@ class BossingTab extends JPanel
 					+ (setup.budget != null ? " of " + Ui.gp(setup.budget) : "")));
 			}
 			gearList.add(emptySlotsSummary(setup));
-			addSlots(setup.picks);
-			if (setup.switches != null)
-			{
-				for (LazyScapingApi.GearSwitch sw : setup.switches)
-				{
-					gearList.add(Ui.subheading(sw.style + " switch"));
-					addSlots(sw.picks);
-				}
-			}
-			if (setup.spec != null)
-			{
-				gearList.add(Ui.subheading("Special attack"));
-				addSlots(List.of(setup.spec));
-			}
+			addSlots(gearList, setup.picks);
+			gearList.add(switchDetails(setup));
 		}
-		if (setup.supplies != null && !setup.supplies.isEmpty())
+		if (setup.inventory != null && !setup.inventory.isEmpty())
 		{
-			gearList.add(Ui.subheading("Inventory · " + Ui.gp(setup.tripCost) + " a trip"));
-			setup.supplies.forEach(line -> gearList.add(lineRow(line)));
-		}
-		if (setup.utility != null && !setup.utility.isEmpty())
-		{
-			gearList.add(Ui.subheading("Also bring"));
-			gearList.add(Ui.wrapped(Ui.muted("Hover an item to see why.")));
-			setup.utility.forEach(line -> gearList.add(lineRow(line)));
+			addInventory(setup);
 		}
 		Ui.refresh(gearList);
+	}
+
+	/** Each switch and spec slot with what to get next, behind a click since the inventory already shows them. */
+	private JComponent switchDetails(LazyScapingApi.GearSetup setup)
+	{
+		JPanel details = Ui.column();
+		if (setup.switches != null)
+		{
+			for (LazyScapingApi.GearSwitch sw : setup.switches)
+			{
+				details.add(Ui.subheading(sw.style + " switch"));
+				addSlots(details, sw.picks);
+			}
+		}
+		if (setup.spec != null)
+		{
+			details.add(Ui.subheading("Special attack"));
+			addSlots(details, List.of(setup.spec));
+		}
+		if (details.getComponentCount() == 0)
+		{
+			return details;
+		}
+		JLabel header = (JLabel) Ui.spaced(Ui.wrapped(Ui.colored(Ui.GOLD, "<u>Switch and spec upgrades</u>")), 10);
+		return Ui.expandable(header, details);
+	}
+
+	/** The inventory as you'd pack it, with how many slots each kind of item takes. */
+	private void addInventory(LazyScapingApi.GearSetup setup)
+	{
+		int size = setup.inventorySize > 0 ? setup.inventorySize : 28;
+		gearList.add(Ui.subheading("Inventory · " + setup.inventory.size() + "/" + size + " slots · " + Ui.gp(setup.tripCost) + " a trip"));
+
+		Map<InventoryKind, Integer> counts = new EnumMap<>(InventoryKind.class);
+		setup.inventory.forEach(slot -> counts.merge(InventoryKind.of(slot.kind), 1, Integer::sum));
+		List<String> parts = new ArrayList<>();
+		counts.forEach((kind, count) -> parts.add(Ui.colored(kind.color, count + " " + (count == 1 ? kind.one : kind.many))));
+		gearList.add(Ui.wrapped(String.join(" · ", parts)));
+
+		JPanel grid = new JPanel(new GridLayout(0, INVENTORY_COLUMNS, 3, 3));
+		grid.setOpaque(false);
+		for (int i = 0; i < size; i++)
+		{
+			grid.add(inventoryCell(i < setup.inventory.size() ? setup.inventory.get(i) : null, setup.runePouch));
+		}
+		// Left-aligned at its own width, rather than stretched across the card.
+		JPanel holder = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+		holder.setOpaque(false);
+		holder.add(grid);
+		gearList.add(Ui.spaced(holder, 6));
+
+		if (setup.foodCut > 0)
+		{
+			gearList.add(Ui.spaced(Ui.wrapped(Ui.muted(setup.foodCut + " food left out so your switches fit.")), 4));
+		}
+		if (setup.overflow > 0)
+		{
+			gearList.add(Ui.spaced(Ui.wrapped(Ui.colored(Ui.MISSING, setup.overflow + " more item" + (setup.overflow == 1 ? "" : "s") + " won't fit in one inventory.")), 4));
+		}
+		gearList.add(Ui.spaced(Ui.wrapped(Ui.muted("Hover an item for details.")), 4));
+	}
+
+	/** One inventory slot: the item's picture (with its stack size), bordered by what kind of item it is. */
+	private JComponent inventoryCell(LazyScapingApi.InventorySlot slot, List<LazyScapingApi.RuneLine> runePouch)
+	{
+		JLabel cell = new JLabel();
+		cell.setPreferredSize(CELL_SIZE);
+		cell.setHorizontalAlignment(SwingConstants.CENTER);
+		cell.setOpaque(true);
+		cell.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		if (slot == null)
+		{
+			cell.setBorder(BorderFactory.createLineBorder(ColorScheme.DARK_GRAY_COLOR));
+			return cell;
+		}
+		InventoryKind kind = InventoryKind.of(slot.kind);
+		cell.setBorder(BorderFactory.createLineBorder(kind.border));
+		icons.load(slot, Math.max(1, slot.qty), false, cell);
+
+		StringBuilder tip = new StringBuilder(Ui.white(Ui.escape(slot.name)));
+		if ("switch".equals(slot.kind) && slot.style != null)
+		{
+			tip.append("<br>").append(Ui.escape(slot.style)).append(" switch");
+		}
+		else if ("spec".equals(slot.kind))
+		{
+			tip.append("<br>Special attack weapon");
+		}
+		if (slot.bought)
+		{
+			tip.append("<br>").append(Ui.colored(Ui.GOLD, "Buy" + (slot.price != null ? ": " + Ui.gp(slot.price) : "")));
+		}
+		else if (!"switch".equals(slot.kind) && !"spec".equals(slot.kind) && slot.price != null && slot.price > 0)
+		{
+			tip.append("<br>").append(Ui.gp(slot.price * Math.max(1, slot.qty)));
+		}
+		if (slot.why != null)
+		{
+			tip.append("<br>").append(Ui.escape(slot.why));
+		}
+		if ("Rune pouch".equals(slot.name) && runePouch != null && !runePouch.isEmpty())
+		{
+			tip.append("<br>Holds:");
+			runePouch.forEach(r -> tip.append("<br>- ").append(r.qty).append(" x ").append(Ui.escape(r.name)));
+		}
+		cell.setToolTipText(Ui.html(tip.toString(), Ui.WRAP_WIDTH));
+		return cell;
+	}
+
+	/** What an inventory slot holds, with how it's labelled and outlined. */
+	private enum InventoryKind
+	{
+		SWITCH("switch", "switch item", "switch items", new Color(0x6fa8dc)),
+		SPEC("spec", "spec weapon", "spec weapons", Ui.GOLD),
+		UTILITY("utility", "teleport or tool", "teleports and tools", new Color(0xb39ddb)),
+		POTION("potion", "potion", "potions", new Color(0x7bc96f)),
+		FOOD("food", "food", "food", new Color(0xd98c5f));
+
+		private final String key;
+		private final String one;
+		private final String many;
+		private final Color color;
+		private final Color border;
+
+		InventoryKind(String key, String one, String many, Color color)
+		{
+			this.key = key;
+			this.one = one;
+			this.many = many;
+			this.color = color;
+			this.border = color.darker();
+		}
+
+		static InventoryKind of(String key)
+		{
+			for (InventoryKind kind : values())
+			{
+				if (kind.key.equals(key))
+				{
+					return kind;
+				}
+			}
+			return UTILITY;
+		}
 	}
 
 	/** What filling the slots that are still empty would cost on the GE. */
@@ -229,8 +365,10 @@ class BossingTab extends JPanel
 		{
 			return Ui.wrapped(Ui.colored(Ui.READY, "Every slot is filled."));
 		}
-		String text = "Still empty: " + empty + " slot" + (empty == 1 ? "" : "s") + ", " + Ui.colored(Ui.GOLD, Ui.gp(cost))
-			+ (untradeable > 0 ? " + " + untradeable + " untradeable" : "");
+		int tradeable = empty - untradeable;
+		String text = "Still empty: " + empty + " slot" + (empty == 1 ? "" : "s")
+			+ (tradeable > 0 ? ", " + Ui.colored(Ui.GOLD, Ui.gp(cost)) + " to fill" + (untradeable > 0 ? " (+ " + untradeable + " untradeable)" : "")
+			: untradeable == 1 ? ", needing an untradeable item" : ", needing untradeable items");
 		return Ui.spaced(Ui.wrapped(text), 4);
 	}
 
@@ -252,11 +390,11 @@ class BossingTab extends JPanel
 		return out;
 	}
 
-	private void addSlots(List<LazyScapingApi.GearSlot> slots)
+	private void addSlots(JPanel target, List<LazyScapingApi.GearSlot> slots)
 	{
 		if (slots != null)
 		{
-			slots.forEach(s -> gearList.add(slotRow(s)));
+			slots.forEach(s -> target.add(slotRow(s)));
 		}
 	}
 
@@ -300,22 +438,6 @@ class BossingTab extends JPanel
 		return itemRow(picture, text.toString());
 	}
 
-	/** A supply or utility item: its picture (with the quantity on it, like a stack), name and cost. */
-	private JComponent lineRow(LazyScapingApi.ItemLine line)
-	{
-		JLabel picture = picture();
-		icons.load(line, line.qty, false, picture);
-		String text = (line.qty > 1 ? line.qty + " x " : "") + Ui.escape(line.name)
-			+ (line.cost != null && line.cost > 0 ? "<br>" + Ui.muted(Ui.gp(line.cost)) : "");
-		JComponent row = itemRow(picture, text);
-		if (line.why != null)
-		{
-			row.setToolTipText(Ui.html(Ui.escape(line.why), Ui.WRAP_WIDTH));
-			picture.setToolTipText(row.getToolTipText());
-		}
-		return row;
-	}
-
 	private static JLabel picture()
 	{
 		JLabel picture = new JLabel();
@@ -329,19 +451,10 @@ class BossingTab extends JPanel
 	/** An item's picture with text beside it. */
 	private static JComponent itemRow(JLabel picture, String text)
 	{
-		JLabel label = Ui.wrapped(text, ICON_TEXT_WIDTH);
-		JPanel row = new JPanel(new BorderLayout(6, 0))
-		{
-			@Override
-			public void setToolTipText(String tip)
-			{
-				super.setToolTipText(tip);
-				label.setToolTipText(tip);
-			}
-		};
+		JPanel row = new JPanel(new BorderLayout(6, 0));
 		row.setOpaque(false);
 		row.add(picture, BorderLayout.WEST);
-		row.add(label, BorderLayout.CENTER);
+		row.add(Ui.wrapped(text, ICON_TEXT_WIDTH), BorderLayout.CENTER);
 		return Ui.spaced(row, 4);
 	}
 }

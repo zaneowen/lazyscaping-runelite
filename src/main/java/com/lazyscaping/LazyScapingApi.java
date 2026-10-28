@@ -241,8 +241,15 @@ class LazyScapingApi
 		List<GearSlot> picks;
 		List<GearSwitch> switches;
 		GearSlot spec;
-		List<ItemLine> supplies;
-		List<ItemLine> utility;
+		/** One entry per inventory slot: switches, spec weapon, teleports and tools, potions, then food. */
+		List<InventorySlot> inventory;
+		int inventorySize;
+		/** Runes kept in the rune pouch, which takes one slot. */
+		List<RuneLine> runePouch;
+		/** Food left out so the switches fit. */
+		int foodCut;
+		/** Switches and potions that don't fit in one inventory. */
+		int overflow;
 		/** GE cost of the supplies and utility items for one trip. */
 		long tripCost;
 		/** The budget the setup was built with, null for unlimited. */
@@ -289,13 +296,24 @@ class LazyScapingApi
 		List<GearSlot> picks;
 	}
 
-	/** A supply or utility item to bring, with its picture like gear. */
-	static class ItemLine extends GearItem
+	/** One inventory slot and the item in it. */
+	static class InventorySlot extends GearItem
 	{
+		/** "switch", "spec", "utility", "potion" or "food". */
+		String kind;
+		/** The combat style a switch is for. */
+		String style;
+		/** Gear bought with the budget. */
+		boolean bought;
+		/** How many sit in the slot, like a stack of teleport tablets. */
 		int qty;
-		/** Why to bring it (utility items only). */
+		/** Why to bring it (teleports and tools). */
 		String why;
-		/** GE cost for one trip, null when it can't be bought. */
-		Long cost;
+	}
+
+	static class RuneLine
+	{
+		String name;
+		int qty;
 	}
 }
