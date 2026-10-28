@@ -73,6 +73,7 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 	private static final String GOAL_SKILL_KEY = "goalSkill";
 	private static final String GOAL_LEVEL_KEY = "goalLevel";
 	private static final String GOAL_FROM_KEY = "goalFromXp";
+	private static final String GOAL_METHOD_KEY = "goalMethod";
 	private static final String GEAR_BOSS_KEY = "gearBoss";
 	private static final String TRAINING_BUDGET_KEY = "trainingBudget";
 	private static final String GEAR_BUDGET_KEY = "gearBudget";
@@ -163,6 +164,8 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 	/** The boss picked for the gear setup, and the style picked for it (null: the best for your gear). */
 	private String gearBoss;
 	private String gearStyle;
+	/** A training method picked for the goal's plan, or null for the best plan. */
+	private String goalMethod;
 	/** Budgets as picked or typed, like "10M", "Unlimited" or "My coins". */
 	private String trainingBudget = DEFAULT_TRAINING_BUDGET;
 	private String gearBudget = DEFAULT_GEAR_BUDGET;
@@ -345,6 +348,9 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 				// A new skill starts one level up, and progress counts from now.
 				target = Math.min(99, client.getRealSkillLevel(skill) + 1);
 				goalFromXp = client.getSkillExperience(skill);
+				// A picked method belongs to the old skill.
+				goalMethod = null;
+				configManager.unsetRSProfileConfiguration(LazyScapingConfig.GROUP, GOAL_METHOD_KEY);
 				int shown = target;
 				ui(() -> panel.setGoal(skill, shown));
 			}
@@ -408,6 +414,38 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 			}
 			fetchGear();
 		});
+	}
+
+	@Override
+	public void methodPicked(String methodId)
+	{
+		clientThread.invoke(() ->
+		{
+			goalMethod = methodId;
+			if (player != null)
+			{
+				if (methodId == null)
+				{
+					configManager.unsetRSProfileConfiguration(LazyScapingConfig.GROUP, GOAL_METHOD_KEY);
+				}
+				else
+				{
+					configManager.setRSProfileConfiguration(LazyScapingConfig.GROUP, GOAL_METHOD_KEY, methodId);
+				}
+			}
+			fetchPlan();
+		});
+	}
+
+	@Override
+	public void openUrl(String url)
+	{
+		// Only links the site sent for the OSRS Wiki.
+		HttpUrl parsed = HttpUrl.parse(url);
+		if (parsed != null && parsed.host().equals("oldschool.runescape.wiki"))
+		{
+			LinkBrowser.browse(parsed.toString());
+		}
 	}
 
 	@Override
@@ -477,6 +515,7 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 		goalSkill = skillNamed(configManager.getRSProfileConfiguration(LazyScapingConfig.GROUP, GOAL_SKILL_KEY));
 		goalLevel = parseInt(configManager.getRSProfileConfiguration(LazyScapingConfig.GROUP, GOAL_LEVEL_KEY), 99);
 		goalFromXp = parseInt(configManager.getRSProfileConfiguration(LazyScapingConfig.GROUP, GOAL_FROM_KEY), 0);
+		goalMethod = configManager.getRSProfileConfiguration(LazyScapingConfig.GROUP, GOAL_METHOD_KEY);
 
 		gearBoss = configManager.getRSProfileConfiguration(LazyScapingConfig.GROUP, GEAR_BOSS_KEY);
 		gearStyle = null;
@@ -563,6 +602,10 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 		body.add("unlocks", unlocks);
 		body.addProperty("priority", config.priority().apiValue);
 		addBudget(body, trainingBudget);
+		if (goalMethod != null)
+		{
+			body.addProperty("method", goalMethod);
+		}
 
 		ui(() -> panel.showPlanMessage("Loading your plan..."));
 		api.plan(body, plan -> ui(() -> panel.showPlan(plan)), error -> ui(() -> panel.showPlanMessage(error)));

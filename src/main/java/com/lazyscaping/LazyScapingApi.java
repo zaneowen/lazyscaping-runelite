@@ -39,8 +39,43 @@ class LazyScapingApi
 	@Inject
 	private Gson gson;
 
+	static class MethodGuide
+	{
+		String where;
+		List<String> travel;
+		List<String> steps;
+		List<String> bring;
+		List<String> needs;
+		/** OSRS Wiki page with the full details. */
+		String wiki;
+	}
+
+	/** A training method for the skill, as the Training page lists them. */
+	static class MethodOption
+	{
+		String id;
+		String name;
+		int level;
+		int xpHr;
+		/** Positive costs gp per xp, negative makes gp. */
+		double gpPerXp;
+		/** 1 click-intensive, 2 moderate, 3 very AFK. */
+		int afk;
+		boolean members;
+		boolean ironFriendly;
+		String notes;
+		MethodGuide guide;
+		boolean available;
+		/** Why it can't be used yet, e.g. "Needs level 70". */
+		List<String> blockers;
+		/** Can be picked: nothing but level stands in the way before the goal. */
+		boolean pickable;
+	}
+
 	static class PlanStep
 	{
+		/** The method's id, to find it in the plan's options. */
+		String id;
 		String method;
 		int fromLevel;
 		int toLevel;
@@ -58,7 +93,11 @@ class LazyScapingApi
 		long totalCost;
 		/** Even the cheapest methods cost more than the budget. */
 		boolean overBudget;
+		/** The method the player picked, when the plan could use it. */
+		String method;
 		List<PlanStep> steps;
+		/** Every method for the skill, available ones first. */
+		List<MethodOption> options;
 	}
 
 	static class MissingLevel

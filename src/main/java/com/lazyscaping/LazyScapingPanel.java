@@ -54,6 +54,11 @@ class LazyScapingPanel extends PluginPanel
 		/** The player set a valid budget for training (or for gear when `gear` is true). */
 		void budgetChanged(boolean gear, String budget);
 
+		/** The player picked a training method to plan around, or null for the best plan. */
+		void methodPicked(String methodId);
+
+		void openUrl(String url);
+
 		void refresh();
 	}
 
@@ -94,6 +99,9 @@ class LazyScapingPanel extends PluginPanel
 	private static final Dimension ICON_SIZE = new Dimension(36, 32);
 	/** Text next to an item picture wraps narrower. */
 	private static final int ICON_TEXT_WIDTH = WRAP_WIDTH - (ICON_SIZE.width + 6) * 3 / 4;
+	/** How far method details are indented under their header, and the width they wrap at. */
+	private static final int DETAIL_INDENT = 8;
+	private static final int DETAIL_WIDTH = WRAP_WIDTH - DETAIL_INDENT;
 
 	private final Actions actions;
 	private final Icons icons;
@@ -106,6 +114,7 @@ class LazyScapingPanel extends PluginPanel
 	private final JComboBox<String> trainingBudget = budgetBox(Budget.TRAINING_PRESETS);
 	private final JLabel trainingBudgetNote = wrapped("");
 	private final JPanel planList = column();
+	private final JPanel methodList = column();
 	private final JComboBox<String> gearBudget = budgetBox(Budget.GEAR_PRESETS);
 	private final JLabel gearBudgetNote = wrapped("");
 	/** Holds the gear budget; hidden for ironmen, who can't buy from the GE. */
@@ -204,6 +213,11 @@ class LazyScapingPanel extends PluginPanel
 		plan.add(gap(4));
 		plan.add(planList);
 		tab.add(plan);
+		tab.add(gap(8));
+
+		JPanel methods = card("Training methods");
+		methods.add(methodList);
+		tab.add(methods);
 		return tab;
 	}
 
@@ -469,22 +483,214 @@ class LazyScapingPanel extends PluginPanel
 			{
 				planList.add(wrapped("<font color='" + hex(MISSING) + "'>Over your budget, so this uses the cheapest methods.</font>"));
 			}
+			if (plan.method != null)
+			{
+				planList.add(wrapped("<font color='" + hex(GOLD) + "'>Using the method you picked where it can be.</font>"));
+			}
+			planList.add(wrapped("<font color='" + MUTED + "'>Click a step for details.</font>"));
 			for (LazyScapingApi.PlanStep step : plan.steps)
 			{
-				JLabel label = wrapped("<font color='#ffffff'>Level " + step.fromLevel + "-" + step.toLevel + "</font><br>"
-					+ "<font color='" + hex(GOLD) + "'>" + escape(step.method) + "</font><br>"
-					+ NUMBER.format(step.xpHr) + " xp/hr · " + hours(step.hours));
-				label.setToolTipText(step.notes);
-				label.setBorder(new EmptyBorder(6, 0, 0, 0));
-				planList.add(label);
+				LazyScapingApi.MethodOption option = optionFor(plan, step.id);
+				StringBuilder text = new StringBuilder("<font color='#ffffff'>Level ").append(step.fromLevel).append('-').append(step.toLevel).append("</font><br>")
+					.append("<font color='").append(hex(GOLD)).append("'>").append(escape(step.method)).append("</font><br>")
+					.append(NUMBER.format(step.xpHr)).append(" xp/hr · ").append(hours(step.hours));
+				if (step.cost != 0)
+				{
+					text.append(" · ").append(step.cost > 0 ? "costs " + gp(step.cost) : "makes " + gp(-step.cost));
+				}
+				if (option != null)
+				{
+					text.append("<br><font color='").append(MUTED).append("'>").append(effort(option.afk)).append("</font>");
+				}
+				JLabel header = wrapped(text.toString());
+				header.setBorder(new EmptyBorder(8, 0, 0, 0));
+				planList.add(option == null ? header : expandable(header, methodDetails(option)));
 			}
 		}
+		showMethods(plan);
 		refreshLayout(planList);
 	}
 
 	void showPlanMessage(String message)
 	{
 		showMessage(planList, message);
+		showMessage(methodList, null);
+	}
+
+	private static LazyScapingApi.MethodOption optionFor(LazyScapingApi.Plan plan, String id)
+	{
+		if (plan.options != null)
+		{
+			for (LazyScapingApi.MethodOption o : plan.options)
+			{
+				if (o.id.equals(id))
+				{
+					return o;
+				}
+			}
+		}
+		return null;
+	}
+
+	/** Every method for the skill, each with its details and a button to plan around it. */
+	private void showMethods(LazyScapingApi.Plan plan)
+	{
+		methodList.removeAll();
+		if (plan.options == null || plan.options.isEmpty() || plan.goalReached)
+		{
+			methodList.add(wrapped(plan.goalReached ? "" : "No methods for this skill yet."));
+			refreshLayout(methodList);
+			return;
+		}
+		methodList.add(wrapped("<font color='" + MUTED + "'>Click a method for details. Pick one to plan around it.</font>"));
+		if (plan.method != null)
+		{
+			JButton best = button("Back to the best plan");
+			best.addActionListener(e -> actions.methodPicked(null));
+			methodList.add(gap(4));
+			methodList.add(full(best));
+		}
+		for (LazyScapingApi.MethodOption o : plan.options)
+		{
+			boolean picked = o.id.equals(plan.method);
+			Color color = picked ? GOLD : o.available ? READY : o.pickable ? Color.WHITE : ColorScheme.MEDIUM_GRAY_COLOR;
+			StringBuilder text = new StringBuilder("<font color='").append(hex(color)).append("'>").append(escape(o.name))
+				.append(picked ? " (picked)" : "").append("</font><br>Level ").append(o.level).append(" · ")
+				.append(NUMBER.format(o.xpHr)).append(" xp/hr · ").append(gpPerXp(o.gpPerXp));
+			if (!o.pickable && o.blockers != null && !o.blockers.isEmpty())
+			{
+				text.append("<br><font color='").append(hex(MISSING)).append("'>").append(escape(String.join(", ", o.blockers))).append("</font>");
+			}
+			else if (!o.available)
+			{
+				text.append("<br><font color='").append(MUTED).append("'>From level ").append(o.level).append("</font>");
+			}
+			JLabel header = wrapped(text.toString());
+			header.setBorder(new EmptyBorder(8, 0, 0, 0));
+
+			JPanel details = methodDetails(o);
+			if (o.pickable && !picked)
+			{
+				JButton use = button("Use this method", DETAIL_WIDTH);
+				use.addActionListener(e -> actions.methodPicked(o.id));
+				details.add(gap(4));
+				details.add(full(use));
+			}
+			else if (picked)
+			{
+				JButton clear = button("Back to the best plan", DETAIL_WIDTH);
+				clear.addActionListener(e -> actions.methodPicked(null));
+				details.add(gap(4));
+				details.add(full(clear));
+			}
+			methodList.add(expandable(header, details));
+		}
+		refreshLayout(methodList);
+	}
+
+	/** A method's effort, cost, notes and how-to guide. */
+	private JPanel methodDetails(LazyScapingApi.MethodOption o)
+	{
+		JPanel details = column();
+		details.setBorder(new EmptyBorder(4, DETAIL_INDENT, 2, 0));
+		StringBuilder text = new StringBuilder(effort(o.afk)).append(" · ").append(gpPerXp(o.gpPerXp));
+		if (o.members)
+		{
+			text.append(" · Members");
+		}
+		if (!o.ironFriendly)
+		{
+			text.append(" · Hard for ironmen");
+		}
+		details.add(wrapped(text.toString(), DETAIL_WIDTH));
+		if (o.notes != null)
+		{
+			details.add(spaced(wrapped(escape(o.notes), DETAIL_WIDTH)));
+		}
+		LazyScapingApi.MethodGuide g = o.guide;
+		if (g != null)
+		{
+			if (g.where != null)
+			{
+				details.add(spaced(wrapped("<font color='#ffffff'>Where:</font> " + escape(g.where), DETAIL_WIDTH)));
+			}
+			addList(details, "Getting there", g.travel, false);
+			addList(details, "Bring", g.bring, false);
+			addList(details, "Needs", g.needs, false);
+			addList(details, "How to", g.steps, true);
+			if (g.wiki != null)
+			{
+				JLabel wiki = wrapped("<font color='" + hex(GOLD) + "'><u>Full guide on the OSRS Wiki</u></font>", DETAIL_WIDTH);
+				wiki.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+				wiki.addMouseListener(new MouseAdapter()
+				{
+					@Override
+					public void mouseClicked(MouseEvent e)
+					{
+						actions.openUrl(g.wiki);
+					}
+				});
+				details.add(spaced(wiki));
+			}
+		}
+		return details;
+	}
+
+	private void addList(JPanel details, String title, List<String> items, boolean numbered)
+	{
+		if (items == null || items.isEmpty())
+		{
+			return;
+		}
+		StringBuilder text = new StringBuilder("<font color='#ffffff'>").append(title).append(":</font>");
+		for (int i = 0; i < items.size(); i++)
+		{
+			text.append("<br>").append(numbered ? (i + 1) + ". " : "- ").append(escape(items.get(i)));
+		}
+		details.add(spaced(wrapped(text.toString(), DETAIL_WIDTH)));
+	}
+
+	private static JComponent spaced(JComponent c)
+	{
+		c.setBorder(new EmptyBorder(4, 0, 0, 0));
+		return c;
+	}
+
+	/** A header that shows or hides its details when clicked. */
+	private JComponent expandable(JLabel header, JComponent details)
+	{
+		JPanel box = column();
+		details.setVisible(false);
+		header.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+		header.setToolTipText("Click for details");
+		header.addMouseListener(new MouseAdapter()
+		{
+			@Override
+			public void mouseClicked(MouseEvent e)
+			{
+				details.setVisible(!details.isVisible());
+				box.revalidate();
+				box.repaint();
+			}
+		});
+		box.add(header);
+		box.add(details);
+		return box;
+	}
+
+	private static String effort(int afk)
+	{
+		return afk >= 3 ? "Very AFK" : afk == 2 ? "Some clicking" : "Click-intensive";
+	}
+
+	private static String gpPerXp(double gpPerXp)
+	{
+		if (Math.abs(gpPerXp) < 0.05)
+		{
+			return "Free";
+		}
+		String amount = String.format(Locale.ROOT, "%.1f gp/xp", Math.abs(gpPerXp));
+		return gpPerXp > 0 ? "Costs " + amount : "Makes " + amount;
 	}
 
 	void showBosses(LazyScapingApi.Bosses bosses)
@@ -878,8 +1084,14 @@ class LazyScapingPanel extends PluginPanel
 	/** A button whose label wraps instead of being cut off. */
 	private static JButton button(String text)
 	{
+		return button(text, WRAP_WIDTH);
+	}
+
+	/** A button whose label wraps instead of being cut off, in a space `width` wide (CSS px). */
+	private static JButton button(String text, int width)
+	{
 		// Narrower than other text, to leave room for the button's padding.
-		return new JButton("<html><body style='width:" + (WRAP_WIDTH - 15) + "px;text-align:center'>" + escape(text) + "</body></html>");
+		return new JButton("<html><body style='width:" + (width - 15) + "px;text-align:center'>" + escape(text) + "</body></html>");
 	}
 
 	private static JLabel wrapped(String text)
