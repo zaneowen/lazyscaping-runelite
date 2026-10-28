@@ -177,6 +177,12 @@ public class LazyScapingPanel extends PluginPanel
 		training.showPlanMessage(message);
 	}
 
+	/** Shows why the plan couldn't be fetched, with a link to try again. */
+	public void showPlanError(String message)
+	{
+		training.showPlanError(message);
+	}
+
 	public void showGearSetup(GearTarget target, GearSetup setup)
 	{
 		if (target == GearTarget.SLAYER)
@@ -198,6 +204,19 @@ public class LazyScapingPanel extends PluginPanel
 		else
 		{
 			bossing.getSetupView().showMessage(message);
+		}
+	}
+
+	/** Shows why a setup couldn't be fetched, with a link to try again. */
+	public void showGearError(GearTarget target, String message)
+	{
+		if (target == GearTarget.SLAYER)
+		{
+			slayer.showError(message);
+		}
+		else
+		{
+			bossing.getSetupView().showError(message);
 		}
 	}
 

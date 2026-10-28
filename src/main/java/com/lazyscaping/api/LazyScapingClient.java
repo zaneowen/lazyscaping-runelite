@@ -30,6 +30,8 @@ public class LazyScapingClient
 {
 	public static final HttpUrl SITE = HttpUrl.get("https://lazyscaping.app");
 
+	/** The API version this plugin speaks. The site keeps old versions working for plugins not yet updated. */
+	private static final String API = "api/plugin/v1/";
 	private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
 	/** Bumped when the catalog's shape changes, so cached copies of the old one aren't used. */
 	private static final String CATALOG_VERSION = "3";
@@ -47,7 +49,7 @@ public class LazyScapingClient
 	public void catalog(Consumer<Catalog> onSuccess)
 	{
 		HttpUrl url = SITE.newBuilder()
-			.addPathSegments("api/plugin/catalog")
+			.addPathSegments(API + "catalog")
 			.addQueryParameter("v", CATALOG_VERSION)
 			.build();
 		send(new Request.Builder().url(url).build(), Catalog.class, onSuccess, error -> {});
@@ -55,12 +57,12 @@ public class LazyScapingClient
 
 	public void plan(JsonObject body, Consumer<Plan> onSuccess, Consumer<String> onError)
 	{
-		send(post("api/plugin/plan", body), Plan.class, onSuccess, onError);
+		send(post(API + "plan", body), Plan.class, onSuccess, onError);
 	}
 
 	public void gearSetup(JsonObject body, Consumer<GearSetup> onSuccess, Consumer<String> onError)
 	{
-		send(post("api/plugin/gear", body), GearSetup.class, onSuccess, onError);
+		send(post(API + "gear", body), GearSetup.class, onSuccess, onError);
 	}
 
 	/** Downloads one of the site's item pictures, given its path. */
@@ -130,12 +132,13 @@ public class LazyScapingClient
 			public void onFailure(Call call, IOException e)
 			{
 				log.debug("Request to {} failed", request.url(), e);
-				onError.accept("Couldn't reach lazyscaping.app.");
+				onError.accept("Couldn't reach lazyscaping.app. Check your connection and try again.");
 			}
 
 			@Override
 			public void onResponse(Call call, Response response)
 			{
+				T result;
 				try (ResponseBody body = response.body())
 				{
 					String text = body == null ? "" : body.string();
@@ -144,20 +147,36 @@ public class LazyScapingClient
 						onError.accept(errorMessage(text, response.code()));
 						return;
 					}
-					onSuccess.accept(gson.fromJson(text, type));
+					result = gson.fromJson(text, type);
 				}
 				catch (IOException | RuntimeException e)
 				{
 					log.debug("Bad response from {}", request.url(), e);
-					onError.accept("lazyscaping.app sent something unexpected.");
+					result = null;
 				}
+
+				if (result == null)
+				{
+					onError.accept("lazyscaping.app sent something unexpected. Try again, or restart RuneLite to update the plugin.");
+					return;
+				}
+				onSuccess.accept(result);
 			}
 		});
 	}
 
-	/** The site's {@code {"error": "..."}} message, or a generic one. */
+	/** A message for a failed request: the site's {@code {"error": "..."}} message, or one for the status code. */
 	private String errorMessage(String body, int code)
 	{
+		if (code == 404 || code == 410)
+		{
+			// the API version this plugin speaks has been retired
+			return "This version of the plugin is out of date. Restart RuneLite to update it.";
+		}
+		if (code >= 500)
+		{
+			return "lazyscaping.app is having trouble. Try again in a minute.";
+		}
 		try
 		{
 			JsonElement json = gson.fromJson(body, JsonElement.class);
@@ -170,6 +189,6 @@ public class LazyScapingClient
 		{
 			log.debug("Unreadable error response", e);
 		}
-		return "lazyscaping.app had a problem (" + code + ").";
+		return "lazyscaping.app couldn't handle the request (" + code + "). Try again, or restart RuneLite to update the plugin.";
 	}
 }

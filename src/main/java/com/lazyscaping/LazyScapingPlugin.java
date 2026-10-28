@@ -717,7 +717,7 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 		}
 
 		updatePanel(p -> p.showPlanMessage("Loading your plan..."));
-		api.plan(body, plan -> updatePanel(p -> p.showPlan(plan)), error -> updatePanel(p -> p.showPlanMessage(error)));
+		api.plan(body, plan -> updatePanel(p -> p.showPlan(plan)), error -> updatePanel(p -> p.showPlanError(error)));
 	}
 
 	private void fetchGearSetups()
@@ -784,7 +784,7 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 				plan.setup = setup;
 				updatePanel(p -> p.showGearSetup(target, setup));
 			}),
-			error -> updatePanel(p -> p.showGearMessage(target, error)));
+			error -> updatePanel(p -> p.showGearError(target, error)));
 	}
 
 	/** A budget as the API expects it: gp, or null for unlimited. */

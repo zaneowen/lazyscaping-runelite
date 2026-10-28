@@ -85,6 +85,11 @@ class GearSetupView
 		Components.showMessage(setupPanel, message);
 	}
 
+	void showError(String message)
+	{
+		Components.showError(setupPanel, message, actions::refresh);
+	}
+
 	void showBankMessage(String message)
 	{
 		bankMessage.setText(message == null ? "" : Html.muted(Html.escape(message)));

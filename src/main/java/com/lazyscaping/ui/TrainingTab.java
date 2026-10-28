@@ -153,6 +153,12 @@ class TrainingTab extends JPanel
 		}
 	}
 
+	void showPlanError(String message)
+	{
+		Components.showError(planList, message, actions::refresh);
+		Components.showMessage(methodList, null);
+	}
+
 	void showPlanMessage(String message)
 	{
 		Components.showMessage(planList, message);

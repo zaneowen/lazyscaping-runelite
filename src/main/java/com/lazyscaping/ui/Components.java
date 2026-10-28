@@ -328,6 +328,15 @@ final class Components
 		refresh(list);
 	}
 
+	/** Replaces a list's contents with an error, and a link to try again. */
+	static void showError(JPanel list, String message, Runnable retry)
+	{
+		list.removeAll();
+		list.add(label(Html.color(Html.RED, Html.escape(message))));
+		list.add(spaced(textButton("Try again", retry), 4));
+		refresh(list);
+	}
+
 	static void refresh(JComponent component)
 	{
 		component.revalidate();

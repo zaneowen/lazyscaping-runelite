@@ -2,6 +2,10 @@
 
 A RuneLite plugin for [LazyScaping](https://lazyscaping.app), the easy, cheap OSRS training and boss gear planner.
 
+<img src="docs/training.png" alt="The Training tab: a Herblore goal with progress, the plan by level and training methods" width="242"> <img src="docs/bossing.png" alt="The Bossing tab: a Zulrah gear setup with each worn slot, its price and the next upgrade" width="242"> <img src="docs/slayer.png" alt="The Slayer tab: the current task, its requirements, where to kill them and gear for the task" width="242">
+
+Found a bug or have an idea? [Open an issue](https://github.com/zaneowen/lazyscaping-runelite/issues).
+
 ## What it does
 
 **One-click sync.** The *Open my planner on lazyscaping.app* button opens the site with your name, account type, membership, gear and quest unlocks already filled in, so you don't have to type them or paste a bank export. Your gear comes from your equipment, your inventory and your bank (open the bank once so the plugin can see it). The data travels after the `#` in the link, which your browser never sends to the server, and the site saves it in your browser like anything you set there yourself.
@@ -34,7 +38,20 @@ Goals, picked methods, bosses, Slayer tasks and budgets are saved per account.
 
 With *Live recommendations* off, the plugin makes no network requests. Sync only opens a link in your browser.
 
-With it on, the plugin sends your skill levels, the LazyScaping gear ids you own (matched on your computer against the site's gear list, never your full bank), your quest unlocks, your account type, your goal and picked method, your budgets, the house teleports and diary you tick, and the boss or Slayer task you pick to lazyscaping.app. The site uses them to build the plan and gear setup and doesn't store them. Your RuneScape name isn't sent. Item pictures for untradeable items are loaded from lazyscaping.app.
+With it on, the plugin sends what it needs to build your plan and gear setups to lazyscaping.app. The site uses it to answer the request and doesn't store it. Your RuneScape name and your bank are never sent: the gear you own is matched on your computer against the site's gear list, and only the matching LazyScaping gear ids are sent. Data goes in the request body over HTTPS, never in the URL.
+
+### What's sent, and when
+
+All requests go to `https://lazyscaping.app` and are made in the background, never on the game's thread.
+
+| Request | When | What it sends |
+|---|---|---|
+| `GET /api/plugin/v1/catalog` | When the plugin starts with *Live recommendations* on, or when you turn it on | Nothing. It fetches the site's gear names, bosses and Slayer tasks, so new gear is recognised without a plugin update. |
+| `POST /api/plugin/v1/plan` | When you log in, change your goal, method, *Plan priority* or training budget, gain a level, or click *Refresh* | Goal skill, its xp and target level; all skill levels; members and ironman flags; quest unlocks that open training methods; plan priority; training budget in gp; picked method. |
+| `POST /api/plugin/v1/gear` | When you log in, pick a boss, Slayer task or style, change your gear budget or house settings, get or lose gear (at most once a minute), or click *Refresh* | The boss or task and style; all skill levels; LazyScaping ids of the gear you own; members and ironman flags; gear budget in gp; whether the elite Lumbridge Diary is done; the house teleports you tick. |
+| `GET` item pictures | When a setup shows an untradeable item | Nothing. Pictures of tradeable items come from RuneLite. |
+
+The *Open my planner on lazyscaping.app* button is separate: it opens a link in your browser with your name, account type, goal, gear and quest unlocks after the `#`, which browsers don't send to the server. It works with *Live recommendations* off.
 
 ## Development
 
@@ -46,4 +63,4 @@ Run a development client with the plugin loaded:
 
 To log in with a Jagex account, follow [Using Jagex Accounts](https://github.com/runelite/runelite/wiki/Using-Jagex-Accounts).
 
-`src/main/resources/com/lazyscaping/gear-catalog.json` is a copy of https://lazyscaping.app/api/plugin/catalog, bundled so sync works without any requests. Refresh it when the site adds gear or bosses.
+`src/main/resources/com/lazyscaping/gear-catalog.json` is a copy of https://lazyscaping.app/api/plugin/v1/catalog, bundled so sync works without any requests. Refresh it when the site adds gear or bosses.

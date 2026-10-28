@@ -137,6 +137,12 @@ class SlayerTab extends JPanel
 		setupView.showMessage(message);
 	}
 
+	void showError(String message)
+	{
+		showTaskInfo(null);
+		setupView.showError(message);
+	}
+
 	private void showTaskInfo(SlayerTask task)
 	{
 		taskInfo.removeAll();
