@@ -10,12 +10,14 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import net.runelite.api.Client;
 import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.widgets.Widget;
 import net.runelite.client.game.ItemManager;
+import net.runelite.client.game.ItemVariationMapping;
 import net.runelite.client.plugins.banktags.BankTagsService;
 import net.runelite.client.plugins.banktags.TagManager;
 import net.runelite.client.plugins.banktags.tabs.Layout;
@@ -98,7 +100,10 @@ class BankTagLoader
 			}
 		}
 
-		tagManager.registerTag(TAG, itemId -> itemIds.contains(itemId) || names.contains(anyDoseName(itemId)));
+		// other versions of the items are tagged too, like a ring of dueling with fewer charges
+		Set<Integer> baseIds = itemIds.stream().map(ItemVariationMapping::map).collect(Collectors.toSet());
+		tagManager.registerTag(TAG, itemId -> itemIds.contains(itemId) || baseIds.contains(ItemVariationMapping.map(itemId))
+			|| names.contains(anyDoseName(itemId)));
 		layoutManager.saveLayout(new Layout(TAG, layout));
 
 		if (!isBankOpen())
@@ -133,7 +138,7 @@ class BankTagLoader
 	private void open()
 	{
 		pending = false;
-		// other doses of the setup's potions are tagged too, and go below the layout
+		// other versions and doses of the setup's items are tagged too, and go below the layout
 		bankTagsService.openBankTag(TAG, BankTagsService.OPTION_ITEMS_NOT_IN_LAYOUT_AT_BOTTOM);
 	}
 

@@ -34,6 +34,32 @@ public class GearCatalogTest
 		assertEquals("ahrims_robetop", catalog.match("Ahrim's robetop 75"));
 	}
 
+
+	@Test
+	public void matchesOtherVersionsOfGear()
+	{
+		GearCatalog bundled = GearCatalog.bundled(GSON);
+		assertEquals("amulet_of_glory", bundled.match("Amulet of glory(4)"));
+		assertEquals("amulet_of_glory", bundled.match("Amulet of glory (t4)"));
+		assertEquals("rune_platebody", bundled.match("Rune platebody (h3)"));
+		assertEquals("dragon_dagger", bundled.match("Dragon dagger(p++)"));
+		assertEquals("ancestral_hat", bundled.match("Twisted ancestral hat"));
+		assertEquals("torva_platebody", bundled.match("Sanguine torva platebody"));
+		assertEquals("infinity_top", bundled.match("Dark infinity top"));
+		assertEquals("masori_body", bundled.match("Masori body (f)"));
+		assertEquals("infernal_cape", bundled.match("Infernal cape (l)"));
+		assertEquals("dizanas_quiver", bundled.match("Blessed Dizana's quiver (l)"));
+		assertEquals("avernic_defender", bundled.match("Ghommal's avernic defender 6 (l)"));
+		assertEquals("slayer_helmet_i", bundled.match("Radiant slayer helmet (i)"));
+	}
+
+	@Test
+	public void matchesVersionsNamedUnlikeTheirItem()
+	{
+		assertEquals("abyssal_whip", catalog.match("Volcanic abyssal whip", "Abyssal whip"));
+		assertNull(catalog.match("Abyssal whip (broken)", "Abyssal whip"));
+		assertNull(catalog.match("Torva platebody (damaged)"));
+	}
 	@Test
 	public void ignoresOtherItems()
 	{

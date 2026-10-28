@@ -14,6 +14,7 @@ import net.runelite.api.ItemContainer;
 import net.runelite.api.gameval.InventoryID;
 import net.runelite.api.gameval.ItemID;
 import net.runelite.client.game.ItemManager;
+import net.runelite.client.game.ItemVariationMapping;
 
 /**
  * Tracks the gear and coins the player owns. The bank is only available while
@@ -142,7 +143,9 @@ class OwnedItems
 		Map<String, Integer> gear = new HashMap<>();
 		for (int itemId : itemIds)
 		{
-			String gearId = catalog.match(itemManager.getItemComposition(itemId).getName());
+			int baseId = ItemVariationMapping.map(itemId);
+			String baseName = baseId != itemId ? itemManager.getItemComposition(baseId).getName() : null;
+			String gearId = catalog.match(itemManager.getItemComposition(itemId).getName(), baseName);
 			if (gearId != null)
 			{
 				gear.put(gearId, itemId);
