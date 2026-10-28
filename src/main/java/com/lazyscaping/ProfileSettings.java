@@ -15,6 +15,7 @@ class ProfileSettings
 	static final String GOAL_FROM_XP = "goalFromXp";
 	static final String GOAL_METHOD = "goalMethod";
 	static final String GEAR_BOSS = "gearBoss";
+	static final String SLAYER_TASK = "slayerTask";
 	static final String TRAINING_BUDGET = "trainingBudget";
 	static final String GEAR_BUDGET = "gearBudget";
 

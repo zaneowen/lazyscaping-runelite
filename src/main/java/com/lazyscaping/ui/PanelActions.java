@@ -11,16 +11,26 @@ public interface PanelActions
 	/** A training method was picked to plan around, or null for the best plan. */
 	void methodPicked(String methodId);
 
-	/** A boss was picked for the gear setup (null to clear it), and optionally a combat style. */
-	void bossSelected(String bossId, String style);
+	/** A boss was picked for the Bossing setup, or null to clear it. */
+	void bossSelected(String bossId);
+
+	/** A Slayer task was picked for the Slayer setup, or null to clear it. */
+	void taskSelected(String taskId);
+
+	/** A combat style was picked for a setup. */
+	void styleSelected(GearTarget target, String style);
 
 	/** A valid budget was set for training, or for gear when {@code gear} is true. */
 	void budgetChanged(boolean gear, String budget);
 
+	/** Shows a setup's items as a bank tag. */
+	void showInBank(GearTarget target);
+
 	/** Opens the site with the player's data filled in. */
 	void openPlanner();
 
-	void openBossPlan(String bossId);
+	/** Opens a setup's full plan on the site. */
+	void openGearPlan(GearTarget target);
 
 	void openWiki(String url);
 

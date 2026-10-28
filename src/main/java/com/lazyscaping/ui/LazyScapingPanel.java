@@ -3,6 +3,7 @@ package com.lazyscaping.ui;
 import com.lazyscaping.api.Boss;
 import com.lazyscaping.api.GearSetup;
 import com.lazyscaping.api.Plan;
+import com.lazyscaping.api.SlayerTaskRef;
 import java.awt.BorderLayout;
 import java.awt.GridLayout;
 import java.util.List;
@@ -16,14 +17,15 @@ import net.runelite.client.ui.PluginPanel;
 import net.runelite.client.ui.components.materialtabs.MaterialTab;
 import net.runelite.client.ui.components.materialtabs.MaterialTabGroup;
 
-/** The side panel: a header with the sync button, then Training and Bossing tabs. */
+/** The side panel: a header with the sync button, then Training, Bossing and Slayer tabs. */
 public class LazyScapingPanel extends PluginPanel
 {
 	private final TrainingTab training;
 	private final BossingTab bossing;
+	private final SlayerTab slayer;
 	private final JLabel status = Components.label("");
 	private final JLabel liveNotice = Components.label(
-		"Turn on <b>Live recommendations</b> in this plugin's settings to see your training plan and boss gear setups.");
+		"Turn on <b>Live recommendations</b> in this plugin's settings to see your training plan and gear setups.");
 
 	public LazyScapingPanel(PanelActions actions, IconLoader icons)
 	{
@@ -31,6 +33,7 @@ public class LazyScapingPanel extends PluginPanel
 		setLayout(new BorderLayout());
 		training = new TrainingTab(actions, icons);
 		bossing = new BossingTab(actions, icons);
+		slayer = new SlayerTab(actions, icons);
 
 		JLabel title = new JLabel("LazyScaping");
 		title.setFont(FontManager.getRunescapeBoldFont());
@@ -45,11 +48,12 @@ public class LazyScapingPanel extends PluginPanel
 
 		JPanel display = new JPanel(new BorderLayout());
 		MaterialTabGroup tabs = new MaterialTabGroup(display);
-		tabs.setLayout(new GridLayout(1, 2, 4, 0));
+		tabs.setLayout(new GridLayout(1, 3, 2, 0));
 		tabs.setBorder(new EmptyBorder(0, 0, 8, 0));
 		MaterialTab trainingTab = new MaterialTab("Training", tabs, training);
 		tabs.addTab(trainingTab);
 		tabs.addTab(new MaterialTab("Bossing", tabs, bossing));
+		tabs.addTab(new MaterialTab("Slayer", tabs, slayer));
 		tabs.select(trainingTab);
 
 		JPanel content = Components.column();
@@ -77,7 +81,9 @@ public class LazyScapingPanel extends PluginPanel
 		{
 			training.showProgress(null);
 			training.showPlanMessage(null);
-			bossing.showMessage(null);
+			bossing.getSetupView().showMessage(null);
+			slayer.showMessage(null);
+			slayer.setCurrentTask(null);
 		}
 	}
 
@@ -87,17 +93,20 @@ public class LazyScapingPanel extends PluginPanel
 		if (!enabled)
 		{
 			training.showPlanMessage("Needs Live recommendations.");
-			bossing.showMessage("Needs Live recommendations.");
+			bossing.getSetupView().showMessage("Needs Live recommendations.");
+			slayer.showMessage("Needs Live recommendations.");
 		}
 	}
 
 	/** Shows the player's saved choices without reporting them back as changes. */
-	public void setChoices(Skill goalSkill, int goalLevel, String bossId, String trainingBudget, String gearBudget)
+	public void setChoices(Skill goalSkill, int goalLevel, String bossId, String taskId, String trainingBudget, String gearBudget)
 	{
 		training.setGoal(goalSkill, goalLevel);
 		training.setBudget(trainingBudget);
 		bossing.selectBoss(bossId);
-		bossing.setBudget(gearBudget);
+		slayer.selectTask(taskId);
+		setup(GearTarget.BOSS).setBudget(gearBudget);
+		setup(GearTarget.SLAYER).setBudget(gearBudget);
 	}
 
 	public void setGoal(Skill skill, int targetLevel)
@@ -105,15 +114,38 @@ public class LazyScapingPanel extends PluginPanel
 		training.setGoal(skill, targetLevel);
 	}
 
+	/** Keeps both gear budget pickers on the same budget. */
+	public void setGearBudget(String budget)
+	{
+		setup(GearTarget.BOSS).setBudget(budget);
+		setup(GearTarget.SLAYER).setBudget(budget);
+	}
+
 	public void setCoins(long coins)
 	{
 		training.setCoins(coins);
-		bossing.setCoins(coins);
+		setup(GearTarget.BOSS).setCoins(coins);
+		setup(GearTarget.SLAYER).setCoins(coins);
 	}
 
 	public void setBossOptions(List<Boss> bosses)
 	{
 		bossing.setBossOptions(bosses);
+	}
+
+	public void setTaskOptions(List<SlayerTaskRef> tasks)
+	{
+		slayer.setTaskOptions(tasks);
+	}
+
+	/** Shows the game's current Slayer task, like "87 x Abyssal demons, in the Catacombs", or null for none. */
+	public void setCurrentTask(String description, String taskId)
+	{
+		slayer.setCurrentTask(description);
+		if (taskId != null)
+		{
+			slayer.selectTask(taskId);
+		}
 	}
 
 	public void showProgress(GoalProgress progress)
@@ -131,13 +163,42 @@ public class LazyScapingPanel extends PluginPanel
 		training.showPlanMessage(message);
 	}
 
-	public void showGearSetup(GearSetup setup)
+	public void showGearSetup(GearTarget target, GearSetup setup)
 	{
-		bossing.showSetup(setup);
+		if (target == GearTarget.SLAYER)
+		{
+			slayer.showSetup(setup);
+		}
+		else
+		{
+			bossing.getSetupView().showSetup(setup);
+		}
 	}
 
-	public void showGearMessage(String message)
+	public void showGearMessage(GearTarget target, String message)
 	{
-		bossing.showMessage(message);
+		if (target == GearTarget.SLAYER)
+		{
+			slayer.showMessage(message);
+		}
+		else
+		{
+			bossing.getSetupView().showMessage(message);
+		}
+	}
+
+	public void showReadyCheck(GearTarget target, ReadyCheck check)
+	{
+		setup(target).showReadyCheck(check);
+	}
+
+	public void showBankMessage(GearTarget target, String message)
+	{
+		setup(target).showBankMessage(message);
+	}
+
+	private GearSetupView setup(GearTarget target)
+	{
+		return target == GearTarget.SLAYER ? slayer.getSetupView() : bossing.getSetupView();
 	}
 }

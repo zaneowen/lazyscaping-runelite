@@ -42,6 +42,17 @@ public class GearCatalogTest
 	}
 
 	@Test
+	public void matchesSlayerTasksByGameName()
+	{
+		GearCatalog bundled = GearCatalog.bundled(GSON);
+		assertEquals("abyssal_demons", bundled.matchTask("Abyssal demons").getId());
+		assertEquals("kalphites", bundled.matchTask("Kalphite").getId());
+		assertEquals("metal_dragons", bundled.matchTask("Iron dragons").getId());
+		assertNull(bundled.matchTask("Chickens"));
+		assertNull(bundled.matchTask(null));
+	}
+
+	@Test
 	public void loadsBundledCatalog()
 	{
 		GearCatalog bundled = GearCatalog.bundled(GSON);

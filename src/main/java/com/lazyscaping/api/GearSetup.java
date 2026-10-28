@@ -4,11 +4,13 @@ import java.util.Collections;
 import java.util.List;
 import lombok.Getter;
 
-/** The best gear setup for a boss from what the player owns, plus what a budget buys. */
+/** The best gear setup for a boss or Slayer task from what the player owns, plus what a budget buys. */
 @Getter
 public class GearSetup
 {
 	private Boss boss;
+	/** Set when the setup is for a Slayer task. */
+	private SlayerTask task;
 	private String style;
 	/** Styles the boss can be fought with. */
 	private List<String> styles = Collections.emptyList();

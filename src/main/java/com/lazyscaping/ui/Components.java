@@ -10,9 +10,11 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
+import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.ListCellRenderer;
 import javax.swing.SwingConstants;
 import javax.swing.border.EmptyBorder;
 import net.runelite.client.ui.ColorScheme;
@@ -23,6 +25,7 @@ import net.runelite.client.ui.PluginPanel;
 final class Components
 {
 	private static final int CARD_PADDING = 8;
+	private static final int LONG_LIST_ROWS = 15;
 
 	/**
 	 * Width that text wraps at inside a card, in CSS pixels. Swing renders CSS
@@ -176,6 +179,28 @@ final class Components
 		panel.add(header);
 		panel.add(details);
 		return panel;
+	}
+
+	/**
+	 * Sets up a dropdown of many named entries: sized by the placeholder rather
+	 * than the longest entry so it fits the panel, with long names wrapping in
+	 * the open list instead of being cut off.
+	 */
+	static <T> void configureLongList(JComboBox<T> box, T placeholder)
+	{
+		box.addItem(placeholder);
+		box.setPrototypeDisplayValue(placeholder);
+		box.setMaximumRowCount(LONG_LIST_ROWS);
+		ListCellRenderer<? super T> renderer = box.getRenderer();
+		box.setRenderer((list, value, index, selected, focused) ->
+		{
+			Component component = renderer.getListCellRendererComponent(list, value, index, selected, focused);
+			if (index >= 0 && value != null && component instanceof JLabel)
+			{
+				((JLabel) component).setText(Html.wrap(Html.escape(value.toString()), TEXT_WIDTH));
+			}
+			return component;
+		});
 	}
 
 	/** An empty label sized for an item picture. */

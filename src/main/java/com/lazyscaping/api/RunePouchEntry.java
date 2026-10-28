@@ -6,5 +6,6 @@ import lombok.Getter;
 public class RunePouchEntry
 {
 	private String name;
+	private Integer itemId;
 	private int qty;
 }

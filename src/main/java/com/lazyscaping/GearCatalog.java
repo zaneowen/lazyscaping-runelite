@@ -3,6 +3,7 @@ package com.lazyscaping;
 import com.google.gson.Gson;
 import com.lazyscaping.api.Boss;
 import com.lazyscaping.api.Catalog;
+import com.lazyscaping.api.SlayerTaskRef;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
@@ -16,9 +17,9 @@ import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Matches in-game item names to the gear the site's planners know, the same way
- * as the site's bank import: names are normalized, then charged, degraded and
- * decorated suffixes are stripped.
+ * Matches in-game names to what the site's planners know. Item names match gear
+ * the same way as the site's bank import: names are normalized, then charged,
+ * degraded and decorated suffixes are stripped. Task names match Slayer tasks.
  */
 @Slf4j
 class GearCatalog
@@ -30,13 +31,22 @@ class GearCatalog
 	private static final int MAX_STRIPS = 3;
 
 	private final Map<String, String> gearByName = new HashMap<>();
+	private final Map<String, SlayerTaskRef> tasksByName = new HashMap<>();
 	@Getter
 	private final List<Boss> bosses;
+	@Getter
+	private final List<SlayerTaskRef> slayerTasks;
 
 	GearCatalog(Catalog catalog)
 	{
 		catalog.getGear().forEach((id, names) -> names.forEach(name -> gearByName.put(normalize(name), id)));
 		bosses = catalog.getBosses();
+		slayerTasks = catalog.getSlayerTasks();
+		for (SlayerTaskRef task : slayerTasks)
+		{
+			tasksByName.put(taskKey(task.getName()), task);
+			task.getGameNames().forEach(name -> tasksByName.put(taskKey(name), task));
+		}
 	}
 
 	/** The copy bundled with the plugin, so sync works without network access. */
@@ -58,6 +68,19 @@ class GearCatalog
 	{
 		String lower = name.trim().toLowerCase(Locale.ROOT).replace('\u2019', '\'').replace('`', '\'');
 		return WHITESPACE.matcher(lower).replaceAll(" ");
+	}
+
+	/** The site's task for an in-game Slayer task name, or null. */
+	SlayerTaskRef matchTask(String gameName)
+	{
+		return gameName == null ? null : tasksByName.get(taskKey(gameName));
+	}
+
+	/** Task names compare without case or a plural "s", so "Kalphite" matches "Kalphites". */
+	private static String taskKey(String name)
+	{
+		String key = normalize(name);
+		return key.endsWith("s") ? key.substring(0, key.length() - 1) : key;
 	}
 
 	/** The gear id for an in-game item name, or null if the planners don't use it. */
