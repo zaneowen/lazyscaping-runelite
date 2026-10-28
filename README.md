@@ -14,13 +14,15 @@ The side panel has three tabs.
 - **Training methods.** Every method for the skill, with what it needs. Click one for its details and guide, and *Use this method* to plan around it.
 
 **Bossing**
-- **Gear setup.** Pick a boss to see the best setup from the gear you own: the worn gear laid out like the equipment screen (hover a slot for what to get next and its GE price), the packed inventory with switches, the special attack weapon and supplies, and how to get there. With a budget, it also buys the best upgrades you can afford (not for ironmen).
+- **Gear setup.** Pick a boss to see the best setup from the gear you own: each worn slot's item with its picture, what to get next and its GE price, the packed inventory with switches, the special attack weapon and supplies, and how to get there. With a budget, it also buys the best upgrades you can afford (not for ironmen).
 
 **Slayer**
 - **Your task.** The task from RuneLite's Slayer plugin, with kills left, is picked automatically; you can also pick any task. It shows the requirements, where to kill them and tips.
 - **Gear for the task.** The same gear setup as the Bossing tab, planned for the task. *Plan with my Slayer helmet (i)* is ticked when you own one (any colour), and you can tick it yourself if yours is somewhere the plugin can't see.
 
 **Show setup in bank.** Every gear setup can open a temporary *lazyscaping* bank tag with its items, laid out with the worn gear on top and the inventory as it's packed. If your bank is closed, it opens next time you open it.
+
+**Your house and diaries.** In the plugin's settings, *House teleports* lists what your house has (a jewellery box, mounted Xeric's talisman or digsite pendant, or portals). Gear setups then take a house teleport instead of those teleports, freeing inventory space. Once you've done the elite Lumbridge & Draynor Diary (detected in game, or tick *Elite Lumbridge Diary*), fairy ring routes no longer pack a dramen staff.
 
 **Budgets.** Each tab has a budget: a preset, an amount like `25m`, *Unlimited*, or *My coins* (the coins in your bank and inventory).
 

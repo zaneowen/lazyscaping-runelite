@@ -343,6 +343,10 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 			case "priority":
 				clientThread.invoke(this::fetchPlan);
 				break;
+			case "lumbridgeElite":
+			case "houseTeleports":
+				clientThread.invoke(() -> gearPlans.values().forEach(this::fetchGearSetup));
+				break;
 			default:
 				break;
 		}
@@ -749,6 +753,10 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 		body.addProperty("members", account.isMember());
 		body.addProperty("ironman", account.isIronman());
 		body.add("budget", budgetJson(gearBudget));
+		body.addProperty("lumbridgeElite", config.lumbridgeElite() || account.hasLumbridgeElite());
+		JsonArray house = new JsonArray();
+		config.houseTeleports().forEach(teleport -> house.add(teleport.getApiName()));
+		body.add("house", house);
 
 		String requested = plan.selectedId;
 		updatePanel(p -> p.showGearMessage(target, "Building your setup..."));

@@ -115,9 +115,8 @@ class GearSetupView
 			setupPanel.add(bankMessage);
 
 			setupPanel.add(Components.subheading("Worn gear"));
-			setupPanel.add(Components.spaced(EquipmentView.create(setup.getPicks(), icons), 4));
-			setupPanel.add(Components.spaced(Components.label(Html.muted("Hover a slot for details. Faded items are upgrades to get.")), 4));
-			setupPanel.add(gearDetails(setup));
+			setup.getPicks().forEach(slot -> setupPanel.add(slotRow(slot)));
+			setupPanel.add(switchDetails(setup));
 		}
 
 		if (!setup.getInventory().isEmpty())
@@ -200,11 +199,10 @@ class GearSetupView
 		return slots;
 	}
 
-	/** Every slot of the worn gear, switches and spec weapon with prices and upgrades, behind a link. */
-	private JComponent gearDetails(GearSetup setup)
+	/** Each switch and spec slot with what to get next, behind a link since the inventory already shows them. */
+	private JComponent switchDetails(GearSetup setup)
 	{
 		JPanel details = Components.column();
-		setup.getPicks().forEach(slot -> details.add(slotRow(slot)));
 		for (GearSwitch gearSwitch : setup.getSwitches())
 		{
 			details.add(Components.subheading(gearSwitch.getStyle() + " switch"));
@@ -215,8 +213,12 @@ class GearSetupView
 			details.add(Components.subheading("Special attack"));
 			details.add(slotRow(setup.getSpec()));
 		}
+		if (details.getComponentCount() == 0)
+		{
+			return details;
+		}
 
-		JLabel header = Components.spaced(Components.label(Html.color(Html.GOLD, Html.underline("Gear details, prices and upgrades"))), 6);
+		JLabel header = Components.spaced(Components.label(Html.color(Html.GOLD, Html.underline("Switch and spec upgrades"))), 8);
 		return Components.expandable(header, details);
 	}
 

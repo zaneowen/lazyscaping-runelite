@@ -89,6 +89,12 @@ class Account
 		return client.getWorldType().contains(WorldType.MEMBERS) || client.getVarpValue(VarPlayerID.ACCOUNT_CREDIT) > 0;
 	}
 
+	/** The elite Lumbridge & Draynor Diary is done, so fairy rings don't need a dramen staff. */
+	boolean hasLumbridgeElite()
+	{
+		return client.getVarbitValue(VarbitID.LUMBRIDGE_DIARY_ELITE_COMPLETE) == 1;
+	}
+
 	/** Any kind of ironman, including group ironmen. */
 	boolean isIronman()
 	{

@@ -1,10 +1,13 @@
 package com.lazyscaping;
 
+import java.util.EnumSet;
+import java.util.Set;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
+import net.runelite.client.config.ConfigSection;
 
 @ConfigGroup(LazyScapingConfig.GROUP)
 public interface LazyScapingConfig extends Config
@@ -52,5 +55,37 @@ public interface LazyScapingConfig extends Config
 	default Priority priority()
 	{
 		return Priority.FASTEST;
+	}
+
+	@ConfigSection(
+		name = "Your account",
+		description = "Things the plugin can't always see, used to plan your gear setups",
+		position = 3
+	)
+	String accountSection = "account";
+
+	@ConfigItem(
+		keyName = "lumbridgeElite",
+		name = "Elite Lumbridge Diary",
+		description = "You've done the elite Lumbridge & Draynor Diary, so fairy rings don't need a dramen staff.<br>"
+			+ "It's also detected in game.",
+		section = accountSection,
+		position = 4
+	)
+	default boolean lumbridgeElite()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "houseTeleports",
+		name = "House teleports",
+		description = "What your house has. Gear setups use a house teleport instead of these teleports.",
+		section = accountSection,
+		position = 5
+	)
+	default Set<HouseTeleport> houseTeleports()
+	{
+		return EnumSet.noneOf(HouseTeleport.class);
 	}
 }
