@@ -6,8 +6,6 @@ import java.util.function.Consumer;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
-import net.runelite.client.ui.ColorScheme;
-import net.runelite.client.ui.FontManager;
 
 /** An editable budget picker: a preset, "My coins", or a typed amount like "25m". */
 class BudgetPicker extends JPanel
@@ -38,17 +36,8 @@ class BudgetPicker extends JPanel
 			}
 		});
 
-		JLabel label = new JLabel("Budget");
-		label.setFont(FontManager.getRunescapeSmallFont());
-		label.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
-
-		JPanel row = new JPanel(new BorderLayout(6, 0));
-		row.setOpaque(false);
-		row.add(label, BorderLayout.WEST);
-		row.add(box, BorderLayout.CENTER);
-
 		JPanel content = Components.column();
-		content.add(Components.fullWidth(row));
+		content.add(Components.labeledRow("Budget", box));
 		content.add(note);
 		add(content, BorderLayout.CENTER);
 		updateNote();

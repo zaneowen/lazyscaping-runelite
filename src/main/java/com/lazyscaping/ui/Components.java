@@ -5,9 +5,12 @@ import java.awt.Color;
 import java.awt.Component;
 import java.awt.Cursor;
 import java.awt.Dimension;
+import java.awt.FlowLayout;
 import java.awt.GridLayout;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.util.List;
+import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
@@ -39,8 +42,66 @@ final class Components
 	/** Width that text beside an item picture wraps at. */
 	static final int TEXT_BESIDE_ICON_WIDTH = TEXT_WIDTH - (ICON_SIZE.width + 6) * 3 / 4;
 
+	/** An item slot in a grid: a sprite plus a 1px border each side. */
+	private static final Dimension CELL_SIZE = new Dimension(ICON_SIZE.width + 2, ICON_SIZE.height + 2);
+	private static final int GRID_GAP = 3;
+	/** Width of the labels in front of pickers, so the pickers line up. */
+	private static final int PICKER_LABEL_WIDTH = 44;
+
 	private Components()
 	{
+	}
+
+	/** A dropdown or other control with a short label in front of it. */
+	static JComponent labeledRow(String label, JComponent control)
+	{
+		JLabel name = new JLabel(label);
+		name.setFont(FontManager.getRunescapeSmallFont());
+		name.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+		name.setPreferredSize(new Dimension(PICKER_LABEL_WIDTH, name.getPreferredSize().height));
+
+		JPanel row = new JPanel(new BorderLayout(4, 0));
+		row.setOpaque(false);
+		row.add(name, BorderLayout.WEST);
+		row.add(control, BorderLayout.CENTER);
+		return fullWidth(row);
+	}
+
+	/** A slot of an item grid, outlined in {@code border}, or blank when {@code border} is null. */
+	static JLabel itemCell(Color border)
+	{
+		JLabel cell = new JLabel();
+		cell.setPreferredSize(CELL_SIZE);
+		cell.setHorizontalAlignment(SwingConstants.CENTER);
+		cell.setOpaque(border != null);
+		cell.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		if (border != null)
+		{
+			cell.setBorder(BorderFactory.createLineBorder(border));
+		}
+		return cell;
+	}
+
+	/** A grid of item cells, kept at its own width rather than stretched across the card. */
+	static JPanel itemGrid(int columns, List<? extends JComponent> cells)
+	{
+		JPanel grid = new JPanel(new GridLayout(0, columns, GRID_GAP, GRID_GAP));
+		grid.setOpaque(false);
+		cells.forEach(grid::add);
+
+		JPanel holder = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+		holder.setOpaque(false);
+		holder.add(grid);
+		return holder;
+	}
+
+	/** Small underlined text that runs {@code action} when clicked, for secondary actions. */
+	static JLabel textButton(String text, Runnable action)
+	{
+		JLabel button = new JLabel("<html>" + Html.color(Html.GOLD, Html.underline(Html.escape(text))) + "</html>");
+		button.setFont(FontManager.getRunescapeSmallFont());
+		onClick(button, action);
+		return button;
 	}
 
 	/** A transparent panel that stacks its children vertically, left-aligned. */

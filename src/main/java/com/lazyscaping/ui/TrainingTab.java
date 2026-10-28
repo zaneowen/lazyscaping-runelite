@@ -7,6 +7,7 @@ import com.lazyscaping.api.PlanStep;
 import com.lazyscaping.api.TrainingMethod;
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.util.List;
 import java.util.Locale;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
@@ -24,6 +25,7 @@ class TrainingTab extends JPanel
 {
 	private static final String NO_SKILL = "Choose a skill";
 	private static final int PROGRESS_STEPS = 1000;
+	private static final int METHODS_SHOWN = 5;
 
 	private final PanelActions actions;
 	private final IconLoader icons;
@@ -212,7 +214,20 @@ class TrainingTab extends JPanel
 			methodList.add(Components.gap(4));
 			methodList.add(Components.fullWidth(pickButton("Back to the best plan", null, Components.TEXT_WIDTH)));
 		}
-		plan.getOptions().forEach(method -> methodList.add(methodRow(method, method.getId().equals(plan.getMethod()))));
+		// the first few are shown; the rest, mostly locked, are behind a link
+		JPanel more = Components.column();
+		List<TrainingMethod> options = plan.getOptions();
+		for (int i = 0; i < options.size(); i++)
+		{
+			TrainingMethod method = options.get(i);
+			(i < METHODS_SHOWN ? methodList : more).add(methodRow(method, method.getId().equals(plan.getMethod())));
+		}
+		if (more.getComponentCount() > 0)
+		{
+			int hidden = more.getComponentCount();
+			JLabel header = Components.spaced(Components.label(Html.color(Html.GOLD, Html.underline("Show " + hidden + " more method" + (hidden == 1 ? "" : "s")))), 8);
+			methodList.add(Components.expandable(header, more));
+		}
 		Components.refresh(methodList);
 	}
 

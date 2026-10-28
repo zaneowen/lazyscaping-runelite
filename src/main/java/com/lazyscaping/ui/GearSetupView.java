@@ -6,7 +6,6 @@ import com.lazyscaping.api.GearSlot;
 import com.lazyscaping.api.GearSwitch;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
@@ -15,8 +14,8 @@ import javax.swing.JPanel;
 
 /**
  * A gear setup with its style and budget pickers: the worn gear, what a budget
- * buys, the packed inventory, a check of what the player is carrying, and how
- * to get there. Shared by the Bossing and Slayer tabs.
+ * buys, the packed inventory and how to get there. Shared by the Bossing and
+ * Slayer tabs.
  */
 class GearSetupView
 {
@@ -24,11 +23,10 @@ class GearSetupView
 	private final IconLoader icons;
 
 	private final JComboBox<String> styleBox = new JComboBox<>();
-	private final JComponent styleRow = Components.fullWidth(styleBox);
+	private final JComponent styleRow = Components.labeledRow("Style", styleBox);
 	private final BudgetPicker budget;
 	private final JButton bankButton = Components.button("Show setup in bank");
 	private final JLabel bankMessage = Components.label("");
-	private final JLabel readyCheck = Components.label("");
 	private final JPanel setupPanel = Components.column();
 	private final JPanel panel = Components.column();
 
@@ -53,16 +51,11 @@ class GearSetupView
 		bankButton.setToolTipText("Tags the setup's gear and supplies in your bank, laid out like your inventory");
 		bankButton.addActionListener(e -> actions.showInBank(target));
 		bankMessage.setVisible(false);
-		readyCheck.setVisible(false);
-
-		JButton fullPlan = Components.button("Full gear plan on lazyscaping.app");
-		fullPlan.addActionListener(e -> actions.openGearPlan(target));
 
 		panel.add(styleRow);
 		panel.add(budget);
 		panel.add(setupPanel);
-		panel.add(Components.gap(4));
-		panel.add(Components.fullWidth(fullPlan));
+		panel.add(Components.spaced(Components.textButton("Open the full plan on lazyscaping.app", () -> actions.openGearPlan(target)), 10));
 		showMessage(null);
 	}
 
@@ -98,28 +91,6 @@ class GearSetupView
 		bankMessage.setVisible(message != null);
 	}
 
-	void showReadyCheck(ReadyCheck check)
-	{
-		if (check == null)
-		{
-			readyCheck.setVisible(false);
-			return;
-		}
-
-		if (check.isComplete())
-		{
-			readyCheck.setText(Html.color(Html.GREEN, "You have everything for this setup."));
-		}
-		else
-		{
-			String missing = check.getMissing().stream()
-				.map(m -> (m.getQuantity() > 1 ? m.getQuantity() + " x " : "") + Html.escape(m.getName()))
-				.collect(Collectors.joining("<br>"));
-			readyCheck.setText(Html.color(Html.RED, "Missing from your inventory and gear:") + "<br>" + missing);
-		}
-		readyCheck.setVisible(true);
-	}
-
 	void showSetup(GearSetup setup)
 	{
 		updating = true;
@@ -131,33 +102,22 @@ class GearSetupView
 		budget.setVisible(!setup.isIronman());
 
 		setupPanel.removeAll();
-		String name = setup.getTask() != null ? setup.getTask().getName() : setup.getBoss() != null ? setup.getBoss().getName() : "";
-		setupPanel.add(Components.label(Html.white(Html.escape(name)) + "<br>" + Html.escape(setup.getStyle()) + " · " + gearSource(setup)));
-
+		setupPanel.add(Components.spaced(Components.label(Html.muted(Html.escape(setup.getStyle()) + " · " + gearSource(setup))), 6));
 		if (setup.getNoGear() != null)
 		{
-			setupPanel.add(Components.label(Html.escape(setup.getNoGear())));
+			setupPanel.add(Components.spaced(Components.label(Html.escape(setup.getNoGear())), 4));
 		}
 		else
 		{
-			if (setup.isSuppliesOverBudget())
-			{
-				setupPanel.add(Components.label(Html.color(Html.RED, "Supplies cost more than your budget, so no gear was bought.")));
-			}
-			if (setup.getGearCost() > 0)
-			{
-				String of = setup.getBudget() != null ? " of " + Format.gp(setup.getBudget()) : "";
-				setupPanel.add(Components.label("Buying upgrades: " + Html.color(Html.GOLD, Format.gp(setup.getGearCost())) + of));
-			}
-			setupPanel.add(Components.spaced(Components.label(emptySlotsSummary(setup)), 4));
-
+			addSummary(setup);
 			setupPanel.add(Components.gap(6));
 			setupPanel.add(Components.fullWidth(bankButton));
 			setupPanel.add(bankMessage);
-			setupPanel.add(Components.spaced(readyCheck, 4));
 
-			setup.getPicks().forEach(slot -> setupPanel.add(slotRow(slot)));
-			setupPanel.add(switchDetails(setup));
+			setupPanel.add(Components.subheading("Worn gear"));
+			setupPanel.add(Components.spaced(EquipmentView.create(setup.getPicks(), icons), 4));
+			setupPanel.add(Components.spaced(Components.label(Html.muted("Hover a slot for details. Faded items are upgrades to get.")), 4));
+			setupPanel.add(gearDetails(setup));
 		}
 
 		if (!setup.getInventory().isEmpty())
@@ -166,6 +126,20 @@ class GearSetupView
 		}
 		TravelView.addTo(setupPanel, setup.getTravel(), actions, icons);
 		Components.refresh(setupPanel);
+	}
+
+	private void addSummary(GearSetup setup)
+	{
+		if (setup.isSuppliesOverBudget())
+		{
+			setupPanel.add(Components.spaced(Components.label(Html.color(Html.RED, "Supplies cost more than your budget, so no gear was bought.")), 4));
+		}
+		if (setup.getGearCost() > 0)
+		{
+			String of = setup.getBudget() != null ? " of " + Format.gp(setup.getBudget()) : "";
+			setupPanel.add(Components.spaced(Components.label("Buying upgrades: " + Html.color(Html.GOLD, Format.gp(setup.getGearCost())) + of), 4));
+		}
+		setupPanel.add(Components.spaced(Components.label(emptySlotsSummary(setup)), 4));
 	}
 
 	private static String gearSource(GearSetup setup)
@@ -226,10 +200,11 @@ class GearSetupView
 		return slots;
 	}
 
-	/** Each switch and spec slot with what to get next, behind a link since the inventory already shows them. */
-	private JComponent switchDetails(GearSetup setup)
+	/** Every slot of the worn gear, switches and spec weapon with prices and upgrades, behind a link. */
+	private JComponent gearDetails(GearSetup setup)
 	{
 		JPanel details = Components.column();
+		setup.getPicks().forEach(slot -> details.add(slotRow(slot)));
 		for (GearSwitch gearSwitch : setup.getSwitches())
 		{
 			details.add(Components.subheading(gearSwitch.getStyle() + " switch"));
@@ -240,12 +215,8 @@ class GearSetupView
 			details.add(Components.subheading("Special attack"));
 			details.add(slotRow(setup.getSpec()));
 		}
-		if (details.getComponentCount() == 0)
-		{
-			return details;
-		}
 
-		JLabel header = Components.spaced(Components.label(Html.color(Html.GOLD, Html.underline("Switch and spec upgrades"))), 10);
+		JLabel header = Components.spaced(Components.label(Html.color(Html.GOLD, Html.underline("Gear details, prices and upgrades"))), 6);
 		return Components.expandable(header, details);
 	}
 

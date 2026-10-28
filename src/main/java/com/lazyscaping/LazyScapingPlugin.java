@@ -15,13 +15,13 @@ import com.lazyscaping.ui.GearTarget;
 import com.lazyscaping.ui.GoalProgress;
 import com.lazyscaping.ui.LazyScapingPanel;
 import com.lazyscaping.ui.PanelActions;
-import com.lazyscaping.ui.ReadyCheck;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.function.Consumer;
 import javax.inject.Inject;
 import javax.swing.SwingUtilities;
@@ -72,6 +72,7 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 	/** Game ticks between goal progress and Slayer task updates. */
 	private static final int UPDATE_TICKS = 5;
 	private static final String WIKI_HOST = "oldschool.runescape.wiki";
+	private static final String SLAYER_HELMET = "slayer_helmet_i";
 
 	@Inject
 	private Client client;
@@ -107,9 +108,6 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 	private ItemIconLoader iconLoader;
 
 	@Inject
-	private ReadyChecker readyChecker;
-
-	@Inject
 	private BankTagLoader bankTagLoader;
 
 	@Inject
@@ -135,6 +133,8 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 	private final Map<GearTarget, GearPlan> gearPlans = new EnumMap<>(GearTarget.class);
 	private String slayerTaskName;
 	private int slayerTaskRemaining;
+	/** Whether to plan Slayer gear with a Slayer helmet (i), or null to follow whether one is owned. */
+	private Boolean slayerHelmet;
 
 	private String trainingBudget = DEFAULT_TRAINING_BUDGET;
 	private String gearBudget = DEFAULT_GEAR_BUDGET;
@@ -288,9 +288,10 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 			long coins = ownedItems.coins();
 			updatePanel(p -> p.setCoins(coins));
 		}
-		if (containerId != InventoryID.BANK)
+		if (slayerHelmet == null)
 		{
-			gearPlans.values().forEach(this::updateReadyCheck);
+			boolean owned = ownsSlayerHelmet();
+			updatePanel(p -> p.setSlayerHelmet(owned));
 		}
 		if (config.liveRecommendations())
 		{
@@ -404,6 +405,17 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 	public void taskSelected(String taskId)
 	{
 		clientThread.invoke(() -> selectGear(GearTarget.SLAYER, taskId, ProfileSettings.SLAYER_TASK));
+	}
+
+	@Override
+	public void slayerHelmetChanged(boolean planWithHelmet)
+	{
+		clientThread.invoke(() ->
+		{
+			slayerHelmet = planWithHelmet;
+			saveIfLoggedIn(ProfileSettings.SLAYER_HELMET, String.valueOf(planWithHelmet));
+			fetchGearSetup(gearPlans.get(GearTarget.SLAYER));
+		});
 	}
 
 	@Override
@@ -546,6 +558,8 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 		boss.selectedId = settings.get(ProfileSettings.GEAR_BOSS);
 		slayer.selectedId = settings.get(ProfileSettings.SLAYER_TASK);
 		slayerTaskName = null;
+		String savedHelmet = settings.get(ProfileSettings.SLAYER_HELMET);
+		slayerHelmet = savedHelmet == null ? null : Boolean.valueOf(savedHelmet);
 
 		Skill skill = goalSkill;
 		int level = goalLevel;
@@ -554,11 +568,13 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 		String training = trainingBudget;
 		String gear = gearBudget;
 		long coins = ownedItems.coins();
+		boolean helmet = planWithSlayerHelmet();
 		updatePanel(p ->
 		{
 			p.setLoggedIn(true);
 			p.setChoices(skill, level, bossId, taskId, training, gear);
 			p.setCoins(coins);
+			p.setSlayerHelmet(helmet);
 		});
 
 		planLevel = -1;
@@ -574,12 +590,18 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 		plan.selectedId = id;
 		plan.reset();
 		saveIfLoggedIn(settingKey, id);
-		updatePanel(p ->
-		{
-			p.showReadyCheck(target, null);
-			p.showBankMessage(target, null);
-		});
+		updatePanel(p -> p.showBankMessage(target, null));
 		fetchGearSetup(plan);
+	}
+
+	private boolean ownsSlayerHelmet()
+	{
+		return ownedItems.gear(catalog).contains(SLAYER_HELMET);
+	}
+
+	private boolean planWithSlayerHelmet()
+	{
+		return slayerHelmet != null ? slayerHelmet : ownsSlayerHelmet();
 	}
 
 	private String savedBudget(String key, String defaultValue)
@@ -693,11 +715,7 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 		if (plan.selectedId == null)
 		{
 			plan.setup = null;
-			updatePanel(p ->
-			{
-				p.showGearMessage(target, null);
-				p.showReadyCheck(target, null);
-			});
+			updatePanel(p -> p.showGearMessage(target, null));
 			return;
 		}
 		if (playerName == null || !config.liveRecommendations())
@@ -707,6 +725,18 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 
 		plan.lastFetchTick = tickCount;
 		plan.fetchedWith = ownedItems.gear(catalog);
+		Set<String> owned = new TreeSet<>(plan.fetchedWith);
+		if (target == GearTarget.SLAYER)
+		{
+			if (planWithSlayerHelmet())
+			{
+				owned.add(SLAYER_HELMET);
+			}
+			else
+			{
+				owned.remove(SLAYER_HELMET);
+			}
+		}
 
 		JsonObject body = new JsonObject();
 		body.addProperty(target == GearTarget.SLAYER ? "task" : "boss", plan.selectedId);
@@ -715,7 +745,7 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 			body.addProperty("style", plan.style);
 		}
 		body.add("levels", account.levels());
-		body.add("owned", gson.toJsonTree(plan.fetchedWith));
+		body.add("owned", gson.toJsonTree(owned));
 		body.addProperty("members", account.isMember());
 		body.addProperty("ironman", account.isIronman());
 		body.add("budget", budgetJson(gearBudget));
@@ -732,19 +762,8 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 				}
 				plan.setup = setup;
 				updatePanel(p -> p.showGearSetup(target, setup));
-				updateReadyCheck(plan);
 			}),
 			error -> updatePanel(p -> p.showGearMessage(target, error)));
-	}
-
-	private void updateReadyCheck(GearPlan plan)
-	{
-		if (plan.setup == null || plan.setup.getNoGear() != null)
-		{
-			return;
-		}
-		ReadyCheck check = readyChecker.check(plan.setup, catalog);
-		updatePanel(p -> p.showReadyCheck(plan.target, check));
 	}
 
 	/** A budget as the API expects it: gp, or null for unlimited. */

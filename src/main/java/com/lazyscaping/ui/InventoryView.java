@@ -4,19 +4,14 @@ import com.lazyscaping.api.GearSetup;
 import com.lazyscaping.api.InventorySlot;
 import com.lazyscaping.api.RunePouchEntry;
 import java.awt.Color;
-import java.awt.Dimension;
-import java.awt.FlowLayout;
-import java.awt.GridLayout;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import javax.swing.BorderFactory;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
-import javax.swing.SwingConstants;
 import lombok.RequiredArgsConstructor;
 import net.runelite.client.ui.ColorScheme;
 
@@ -25,7 +20,6 @@ final class InventoryView
 {
 	private static final int COLUMNS = 4;
 	private static final int DEFAULT_SIZE = 28;
-	private static final Dimension CELL_SIZE = new Dimension(Components.ICON_SIZE.width + 2, Components.ICON_SIZE.height + 2);
 	private static final String RUNE_POUCH = "Rune pouch";
 
 	@RequiredArgsConstructor
@@ -72,7 +66,8 @@ final class InventoryView
 	{
 		List<InventorySlot> slots = setup.getInventory();
 		int size = setup.getInventorySize() > 0 ? setup.getInventorySize() : DEFAULT_SIZE;
-		parent.add(Components.subheading("Inventory · " + slots.size() + "/" + size + " slots · " + Format.gp(setup.getTripCost()) + " a trip"));
+		parent.add(Components.subheading("Inventory"));
+		parent.add(Components.label(Html.muted(slots.size() + "/" + size + " slots · supplies " + Format.gp(setup.getTripCost()) + " a trip")));
 		parent.add(Components.label(slotCounts(slots)));
 		parent.add(Components.spaced(grid(slots, size, setup.getRunePouch(), icons), 6));
 
@@ -85,7 +80,6 @@ final class InventoryView
 			String items = setup.getOverflow() == 1 ? " more item won't" : " more items won't";
 			parent.add(Components.spaced(Components.label(Html.color(Html.RED, setup.getOverflow() + items + " fit in one inventory.")), 4));
 		}
-		parent.add(Components.spaced(Components.label(Html.muted("Hover an item for details.")), 4));
 		parent.add(contents(slots, setup.getRunePouch()));
 	}
 
@@ -101,34 +95,22 @@ final class InventoryView
 
 	private static JPanel grid(List<InventorySlot> slots, int size, List<RunePouchEntry> runePouch, IconLoader icons)
 	{
-		JPanel grid = new JPanel(new GridLayout(0, COLUMNS, 3, 3));
-		grid.setOpaque(false);
+		List<JLabel> cells = new ArrayList<>();
 		for (int i = 0; i < size; i++)
 		{
-			grid.add(cell(i < slots.size() ? slots.get(i) : null, runePouch, icons));
+			cells.add(cell(i < slots.size() ? slots.get(i) : null, runePouch, icons));
 		}
-
-		// keep the grid at its own width rather than stretching it across the card
-		JPanel holder = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
-		holder.setOpaque(false);
-		holder.add(grid);
-		return holder;
+		return Components.itemGrid(COLUMNS, cells);
 	}
 
 	private static JLabel cell(InventorySlot slot, List<RunePouchEntry> runePouch, IconLoader icons)
 	{
-		JLabel cell = new JLabel();
-		cell.setPreferredSize(CELL_SIZE);
-		cell.setHorizontalAlignment(SwingConstants.CENTER);
-		cell.setOpaque(true);
-		cell.setBackground(ColorScheme.DARK_GRAY_COLOR);
 		if (slot == null)
 		{
-			cell.setBorder(BorderFactory.createLineBorder(ColorScheme.DARK_GRAY_COLOR));
-			return cell;
+			return Components.itemCell(ColorScheme.DARK_GRAY_COLOR);
 		}
 
-		cell.setBorder(BorderFactory.createLineBorder(Kind.of(slot.getKind()).color.darker()));
+		JLabel cell = Components.itemCell(Kind.of(slot.getKind()).color.darker());
 		icons.loadItem(slot, Math.max(1, slot.getQty()), false, cell);
 		cell.setToolTipText(Html.wrap(tooltip(slot, runePouch), Components.TEXT_WIDTH));
 		return cell;

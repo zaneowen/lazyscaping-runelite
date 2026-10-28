@@ -8,9 +8,12 @@ import java.awt.BorderLayout;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import net.runelite.client.ui.ColorScheme;
+import net.runelite.client.ui.FontManager;
 
 /** The current Slayer task, where and how to do it, and the gear setup for it. */
 class SlayerTab extends JPanel
@@ -20,6 +23,7 @@ class SlayerTab extends JPanel
 	private final JLabel status = Components.label("");
 	private final JComboBox<SlayerTaskRef> taskBox = new JComboBox<>();
 	private final JPanel taskInfo = Components.column();
+	private final JCheckBox helmetBox = new JCheckBox("Plan with my Slayer helmet (i)");
 	private final GearSetupView setupView;
 	private boolean updating;
 
@@ -40,6 +44,18 @@ class SlayerTab extends JPanel
 			}
 		});
 
+		helmetBox.setOpaque(false);
+		helmetBox.setFont(FontManager.getRunescapeSmallFont());
+		helmetBox.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+		helmetBox.setToolTipText("Ticked automatically when you own one. Tick it if yours is somewhere the plugin can't see, like your house.");
+		helmetBox.addActionListener(e ->
+		{
+			if (!updating)
+			{
+				actions.slayerHelmetChanged(helmetBox.isSelected());
+			}
+		});
+
 		JPanel taskCard = Components.card("Slayer task");
 		taskCard.add(status);
 		taskCard.add(Components.gap(4));
@@ -47,6 +63,7 @@ class SlayerTab extends JPanel
 		taskCard.add(taskInfo);
 
 		JPanel gearCard = Components.card("Gear for this task");
+		gearCard.add(helmetBox);
 		gearCard.add(setupView.getComponent());
 
 		JPanel content = Components.column();
@@ -89,6 +106,13 @@ class SlayerTab extends JPanel
 		updating = false;
 	}
 
+	void setSlayerHelmet(boolean planWithHelmet)
+	{
+		updating = true;
+		helmetBox.setSelected(planWithHelmet);
+		updating = false;
+	}
+
 	/** Shows the task the game has assigned, or prompts to pick one when there's none. */
 	void setCurrentTask(String description)
 	{
@@ -114,12 +138,14 @@ class SlayerTab extends JPanel
 		taskInfo.removeAll();
 		if (task != null)
 		{
-			addTaskInfo(task);
+			addRequirements(task);
+			addSpots(task);
+			addMore(task);
 		}
 		Components.refresh(taskInfo);
 	}
 
-	private void addTaskInfo(SlayerTask task)
+	private void addRequirements(SlayerTask task)
 	{
 		List<String> requirements = new ArrayList<>();
 		if (task.getSlayer() > 1)
@@ -134,25 +160,43 @@ class SlayerTab extends JPanel
 		{
 			taskInfo.add(Components.spaced(Components.label(Html.white("Needs:") + " " + Html.escape(String.join(", ", requirements))), 6));
 		}
-		if (!task.getMasters().isEmpty())
+		if (!task.getNeeds().isEmpty())
 		{
-			taskInfo.add(Components.spaced(Components.label(Html.muted("Assigned by " + Html.escape(String.join(", ", task.getMasters())))), 2));
+			taskInfo.add(Components.spaced(Components.label(Html.white("Bring:") + " " + Html.escape(String.join(", ", task.getNeeds()))), 2));
 		}
+	}
 
-		if (!task.getSpots().isEmpty())
+	private void addSpots(SlayerTask task)
+	{
+		if (task.getSpots().isEmpty())
 		{
-			taskInfo.add(Components.subheading("Where to kill them"));
-			task.getSpots().forEach(spot -> taskInfo.add(Components.spaced(Components.label(spotHtml(spot)), 4)));
+			return;
 		}
+		taskInfo.add(Components.subheading("Where to kill them"));
+		task.getSpots().forEach(spot -> taskInfo.add(Components.spaced(Components.label(spotHtml(spot)), 4)));
+	}
+
+	/** Tips, other places, masters and skip advice, behind a link to keep the tab short. */
+	private void addMore(SlayerTask task)
+	{
+		JPanel more = Components.column();
+		addList(more, "Tips", task.getTips());
 		if (!task.getOtherPlaces().isEmpty())
 		{
-			taskInfo.add(Components.spaced(Components.label(Html.muted("Also found at: " + Html.escape(String.join(", ", task.getOtherPlaces())))), 4));
+			more.add(Components.spaced(Components.label(Html.white("Also found at:") + " " + Html.escape(String.join(", ", task.getOtherPlaces()))), 6));
 		}
-		addList("Bring", task.getNeeds());
-		addList("Tips", task.getTips());
+		if (!task.getMasters().isEmpty())
+		{
+			more.add(Components.spaced(Components.label(Html.white("Assigned by:") + " " + Html.escape(String.join(", ", task.getMasters()))), 6));
+		}
 		if (task.getSkip() != null)
 		{
-			taskInfo.add(Components.spaced(Components.label(Html.white("Rather not?") + " " + Html.escape(task.getSkip())), 6));
+			more.add(Components.spaced(Components.label(Html.white("Rather not?") + " " + Html.escape(task.getSkip())), 6));
+		}
+		if (more.getComponentCount() > 0)
+		{
+			JLabel header = Components.spaced(Components.label(Html.color(Html.GOLD, Html.underline("Tips and more"))), 8);
+			taskInfo.add(Components.expandable(header, more));
 		}
 	}
 
@@ -176,7 +220,7 @@ class SlayerTab extends JPanel
 			+ "<br>" + Html.escape(spot.getHow());
 	}
 
-	private void addList(String title, List<String> items)
+	private static void addList(JPanel panel, String title, List<String> items)
 	{
 		if (items.isEmpty())
 		{
@@ -184,6 +228,6 @@ class SlayerTab extends JPanel
 		}
 		StringBuilder html = new StringBuilder(Html.white(title + ":"));
 		items.forEach(item -> html.append("<br>- ").append(Html.escape(item)));
-		taskInfo.add(Components.spaced(Components.label(html.toString()), 6));
+		panel.add(Components.spaced(Components.label(html.toString()), 6));
 	}
 }

@@ -17,6 +17,9 @@ public interface PanelActions
 	/** A Slayer task was picked for the Slayer setup, or null to clear it. */
 	void taskSelected(String taskId);
 
+	/** The player said whether to plan Slayer gear with a Slayer helmet (i). */
+	void slayerHelmetChanged(boolean planWithHelmet);
+
 	/** A combat style was picked for a setup. */
 	void styleSelected(GearTarget target, String style);
 

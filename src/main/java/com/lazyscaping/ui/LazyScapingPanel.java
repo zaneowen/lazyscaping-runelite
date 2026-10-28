@@ -10,8 +10,10 @@ import java.util.List;
 import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.SwingConstants;
 import javax.swing.border.EmptyBorder;
 import net.runelite.api.Skill;
+import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.PluginPanel;
 import net.runelite.client.ui.components.materialtabs.MaterialTab;
@@ -24,8 +26,7 @@ public class LazyScapingPanel extends PluginPanel
 	private final BossingTab bossing;
 	private final SlayerTab slayer;
 	private final JLabel status = Components.label("");
-	private final JLabel liveNotice = Components.label(
-		"Turn on <b>Live recommendations</b> in this plugin's settings to see your training plan and gear setups.");
+	private final JPanel liveNotice = Components.card("Live recommendations are off");
 
 	public LazyScapingPanel(PanelActions actions, IconLoader icons)
 	{
@@ -38,39 +39,48 @@ public class LazyScapingPanel extends PluginPanel
 		JLabel title = new JLabel("LazyScaping");
 		title.setFont(FontManager.getRunescapeBoldFont());
 		title.setForeground(Html.GOLD);
+		JPanel titleRow = new JPanel(new BorderLayout());
+		titleRow.setOpaque(false);
+		titleRow.add(title, BorderLayout.WEST);
+		titleRow.add(Components.textButton("Refresh", actions::refresh), BorderLayout.EAST);
+
+		liveNotice.add(Components.label("Turn on <b>Live recommendations</b> in this plugin's settings to see your training plan and gear setups."));
 
 		JButton sync = Components.button("Open my planner on lazyscaping.app");
 		sync.setToolTipText("Opens the site with your name, gear and quests filled in");
 		sync.addActionListener(e -> actions.openPlanner());
 
-		JButton refresh = Components.button("Refresh");
-		refresh.addActionListener(e -> actions.refresh());
-
 		JPanel display = new JPanel(new BorderLayout());
 		MaterialTabGroup tabs = new MaterialTabGroup(display);
 		tabs.setLayout(new GridLayout(1, 3, 2, 0));
 		tabs.setBorder(new EmptyBorder(0, 0, 8, 0));
-		MaterialTab trainingTab = new MaterialTab("Training", tabs, training);
+		MaterialTab trainingTab = tab("Training", tabs, training);
 		tabs.addTab(trainingTab);
-		tabs.addTab(new MaterialTab("Bossing", tabs, bossing));
-		tabs.addTab(new MaterialTab("Slayer", tabs, slayer));
+		tabs.addTab(tab("Bossing", tabs, bossing));
+		tabs.addTab(tab("Slayer", tabs, slayer));
 		tabs.select(trainingTab);
 
 		JPanel content = Components.column();
-		content.add(title);
+		content.add(Components.fullWidth(titleRow));
 		content.add(status);
 		content.add(Components.gap(6));
+		content.add(liveNotice);
+		content.add(Components.gap(6));
 		content.add(Components.fullWidth(sync));
-		content.add(Components.gap(8));
+		content.add(Components.gap(10));
 		content.add(tabs);
 		content.add(display);
-		content.add(Components.gap(8));
-		content.add(liveNotice);
-		content.add(Components.gap(4));
-		content.add(Components.fullWidth(refresh));
 		add(content, BorderLayout.NORTH);
 
 		setLoggedIn(false);
+	}
+
+	private static MaterialTab tab(String name, MaterialTabGroup group, JPanel content)
+	{
+		MaterialTab tab = new MaterialTab(name, group, content);
+		tab.setHorizontalAlignment(SwingConstants.CENTER);
+		tab.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+		return tab;
 	}
 
 	public void setLoggedIn(boolean loggedIn)
@@ -105,8 +115,7 @@ public class LazyScapingPanel extends PluginPanel
 		training.setBudget(trainingBudget);
 		bossing.selectBoss(bossId);
 		slayer.selectTask(taskId);
-		setup(GearTarget.BOSS).setBudget(gearBudget);
-		setup(GearTarget.SLAYER).setBudget(gearBudget);
+		setGearBudget(gearBudget);
 	}
 
 	public void setGoal(Skill skill, int targetLevel)
@@ -148,6 +157,11 @@ public class LazyScapingPanel extends PluginPanel
 		}
 	}
 
+	public void setSlayerHelmet(boolean planWithHelmet)
+	{
+		slayer.setSlayerHelmet(planWithHelmet);
+	}
+
 	public void showProgress(GoalProgress progress)
 	{
 		training.showProgress(progress);
@@ -185,11 +199,6 @@ public class LazyScapingPanel extends PluginPanel
 		{
 			bossing.getSetupView().showMessage(message);
 		}
-	}
-
-	public void showReadyCheck(GearTarget target, ReadyCheck check)
-	{
-		setup(target).showReadyCheck(check);
 	}
 
 	public void showBankMessage(GearTarget target, String message)
