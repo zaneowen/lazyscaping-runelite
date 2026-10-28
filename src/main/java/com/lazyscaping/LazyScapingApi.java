@@ -246,6 +246,8 @@ class LazyScapingApi
 		int inventorySize;
 		/** Runes kept in the rune pouch, which takes one slot. */
 		List<RuneLine> runePouch;
+		/** How to get to the boss. */
+		Travel travel;
 		/** Food left out so the switches fit. */
 		int foodCut;
 		/** Switches and potions that don't fit in one inventory. */
@@ -315,5 +317,27 @@ class LazyScapingApi
 	{
 		String name;
 		int qty;
+	}
+
+	/** How to get to a boss, as the Bossing page shows it. */
+	static class Travel
+	{
+		/** The teleports in the plan, with where each one takes you. */
+		List<Teleport> teleports;
+		/** Other ways there, like a house portal or fairy ring. */
+		List<String> routes;
+		String quest;
+		/** Other access requirements, like a key. */
+		String access;
+		/** The routes use fairy rings, which need a dramen staff until the elite Lumbridge & Draynor Diary. */
+		boolean fairyRings;
+		/** The boss's OSRS Wiki strategy page. */
+		String wiki;
+	}
+
+	static class Teleport extends GearItem
+	{
+		/** Where it takes you, and the rest of the way. */
+		String where;
 	}
 }

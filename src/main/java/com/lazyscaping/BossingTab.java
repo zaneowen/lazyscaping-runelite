@@ -8,6 +8,7 @@ import java.awt.FlowLayout;
 import java.awt.GridLayout;
 import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -192,7 +193,9 @@ class BossingTab extends JPanel
 		if (setup.inventory != null && !setup.inventory.isEmpty())
 		{
 			addInventory(setup);
+			addInventoryList(setup);
 		}
+		addTravel(setup.travel);
 		Ui.refresh(gearList);
 	}
 
@@ -256,6 +259,86 @@ class BossingTab extends JPanel
 		gearList.add(Ui.spaced(Ui.wrapped(Ui.muted("Hover an item for details.")), 4));
 	}
 
+	/** What's in the inventory, by kind: each switch, the spec weapon, teleports and tools, potions and food, with counts. */
+	private void addInventoryList(LazyScapingApi.GearSetup setup)
+	{
+		// Group -> item -> how many, in the order they're packed.
+		Map<String, Map<String, Integer>> groups = new LinkedHashMap<>();
+		Map<String, InventoryKind> groupKinds = new LinkedHashMap<>();
+		for (LazyScapingApi.InventorySlot slot : setup.inventory)
+		{
+			InventoryKind kind = InventoryKind.of(slot.kind);
+			String group = kind == InventoryKind.SWITCH && slot.style != null ? slot.style + " switch" : kind.heading;
+			groupKinds.putIfAbsent(group, kind);
+			String name = slot.name;
+			if ("Rune pouch".equals(name) && setup.runePouch != null && !setup.runePouch.isEmpty())
+			{
+				List<String> runes = new ArrayList<>();
+				setup.runePouch.forEach(r -> runes.add(r.qty + " " + r.name));
+				name += " (" + String.join(", ", runes) + ")";
+			}
+			// A stack in one slot counts its items; repeated slots count the slots.
+			groups.computeIfAbsent(group, g -> new LinkedHashMap<>()).merge(name, Math.max(1, slot.qty), Integer::sum);
+		}
+
+		JPanel list = Ui.column();
+		groups.forEach((group, items) ->
+		{
+			StringBuilder text = new StringBuilder(Ui.colored(groupKinds.get(group).color, Ui.escape(group)));
+			items.forEach((name, count) -> text.append("<br>").append(count > 1 ? count + " x " : "").append(Ui.escape(name)));
+			list.add(Ui.spaced(Ui.wrapped(text.toString()), 6));
+		});
+		gearList.add(list);
+	}
+
+	/** How to get to the boss: requirements, the teleports in the plan, other routes and the wiki guide. */
+	private void addTravel(LazyScapingApi.Travel travel)
+	{
+		if (travel == null)
+		{
+			return;
+		}
+		boolean hasTeleports = travel.teleports != null && !travel.teleports.isEmpty();
+		boolean hasRoutes = travel.routes != null && !travel.routes.isEmpty();
+		if (!hasTeleports && !hasRoutes && travel.quest == null && travel.access == null && travel.wiki == null)
+		{
+			return;
+		}
+		gearList.add(Ui.subheading("Getting there"));
+		if (travel.quest != null)
+		{
+			gearList.add(Ui.spaced(Ui.wrapped(Ui.white("Quest:") + " " + Ui.escape(travel.quest)), 4));
+		}
+		if (travel.access != null)
+		{
+			gearList.add(Ui.spaced(Ui.wrapped(Ui.white("Needs:") + " " + Ui.escape(travel.access)), 4));
+		}
+		if (hasTeleports)
+		{
+			for (LazyScapingApi.Teleport teleport : travel.teleports)
+			{
+				JLabel picture = picture();
+				icons.load(teleport, 1, false, picture);
+				gearList.add(itemRow(picture, Ui.escape(teleport.name) + "<br>" + Ui.muted(Ui.escape(teleport.where))));
+			}
+		}
+		if (hasRoutes)
+		{
+			StringBuilder text = new StringBuilder(Ui.white("Other ways:"));
+			travel.routes.forEach(r -> text.append("<br>- ").append(Ui.escape(r)));
+			gearList.add(Ui.spaced(Ui.wrapped(text.toString()), 6));
+			String note = (travel.fairyRings ? "Fairy rings need a dramen staff until you finish the elite Lumbridge & Draynor Diary. " : "")
+				+ "In your house, a portal nexus or jewellery box" + (travel.fairyRings ? " (or fairy ring)" : "") + " turns one house tablet into most of these teleports.";
+			gearList.add(Ui.spaced(Ui.wrapped(Ui.muted(Ui.escape(note))), 4));
+		}
+		if (travel.wiki != null)
+		{
+			JLabel wiki = Ui.wrapped(Ui.colored(Ui.GOLD, "<u>Strategy guide on the OSRS Wiki</u>"));
+			Ui.onClick(wiki, () -> actions.openUrl(travel.wiki));
+			gearList.add(Ui.spaced(wiki, 6));
+		}
+	}
+
 	/** One inventory slot: the item's picture (with its stack size), bordered by what kind of item it is. */
 	private JComponent inventoryCell(LazyScapingApi.InventorySlot slot, List<LazyScapingApi.RuneLine> runePouch)
 	{
@@ -306,21 +389,24 @@ class BossingTab extends JPanel
 	/** What an inventory slot holds, with how it's labelled and outlined. */
 	private enum InventoryKind
 	{
-		SWITCH("switch", "switch item", "switch items", new Color(0x6fa8dc)),
-		SPEC("spec", "spec weapon", "spec weapons", Ui.GOLD),
-		UTILITY("utility", "teleport or tool", "teleports and tools", new Color(0xb39ddb)),
-		POTION("potion", "potion", "potions", new Color(0x7bc96f)),
-		FOOD("food", "food", "food", new Color(0xd98c5f));
+		SWITCH("switch", "Switches", "switch item", "switch items", new Color(0x6fa8dc)),
+		SPEC("spec", "Special attack", "spec weapon", "spec weapons", Ui.GOLD),
+		UTILITY("utility", "Teleports and tools", "teleport or tool", "teleports and tools", new Color(0xb39ddb)),
+		POTION("potion", "Potions", "potion", "potions", new Color(0x7bc96f)),
+		FOOD("food", "Food", "food", "food", new Color(0xd98c5f));
 
 		private final String key;
+		/** Heads the kind's items in the list under the inventory. */
+		private final String heading;
 		private final String one;
 		private final String many;
 		private final Color color;
 		private final Color border;
 
-		InventoryKind(String key, String one, String many, Color color)
+		InventoryKind(String key, String heading, String one, String many, Color color)
 		{
 			this.key = key;
+			this.heading = heading;
 			this.one = one;
 			this.many = many;
 			this.color = color;
