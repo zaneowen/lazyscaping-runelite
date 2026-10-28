@@ -8,6 +8,8 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public enum HouseTeleport
 {
+	FAIRY_RING("Fairy ring", "fairy_ring"),
+	SPIRIT_TREE("Spirit tree", "spirit_tree"),
 	JEWELLERY_BOX("Jewellery box", "jewellery_box"),
 	XERICS_TALISMAN("Mounted Xeric's talisman", "xerics_talisman"),
 	DIGSITE_PENDANT("Mounted digsite pendant", "digsite_pendant"),

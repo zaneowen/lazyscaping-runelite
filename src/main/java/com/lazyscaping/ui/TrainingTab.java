@@ -148,7 +148,7 @@ class TrainingTab extends JPanel
 		{
 			xpLeft.setText(Format.number(left) + " xp to go");
 			rate.setText(progress.getXpPerHour() > 0
-				? Format.number(progress.getXpPerHour()) + " xp/hr · done in " + Format.hours((double) left / progress.getXpPerHour())
+				? Html.parts(Format.number(progress.getXpPerHour()) + " xp/hr", "done in " + Format.hours((double) left / progress.getXpPerHour()))
 				: "Train this skill to see your time left.");
 		}
 	}
@@ -168,8 +168,7 @@ class TrainingTab extends JPanel
 		}
 		else
 		{
-			String cost = Format.cost(plan.getTotalCost());
-			planList.add(Components.label("About " + Format.hours(plan.getTotalHours()) + (cost.isEmpty() ? "" : " · " + cost)));
+			planList.add(Components.label(Html.parts("About " + Format.hours(plan.getTotalHours()), Format.cost(plan.getTotalCost()))));
 			if (plan.isOverBudget())
 			{
 				planList.add(Components.label(Html.color(Html.RED, "Over your budget, so this uses the cheapest methods.")));
@@ -187,10 +186,9 @@ class TrainingTab extends JPanel
 
 	private JComponent stepRow(PlanStep step, TrainingMethod method)
 	{
-		String cost = Format.cost(step.getCost());
 		String text = Html.white("Level " + step.getFromLevel() + "-" + step.getToLevel()) + "<br>"
 			+ Html.color(Html.GOLD, Html.escape(step.getMethod())) + "<br>"
-			+ Format.number(step.getXpHr()) + " xp/hr · " + Format.hours(step.getHours()) + (cost.isEmpty() ? "" : " · " + cost)
+			+ Html.parts(Format.number(step.getXpHr()) + " xp/hr", Format.hours(step.getHours()), Format.cost(step.getCost()))
 			+ (method != null ? "<br>" + Html.muted(Format.effort(method.getAfk())) : "");
 		return expandableRow(methodPicture(method), text, method == null ? null : MethodDetails.create(method, actions, icons, null));
 	}
@@ -238,9 +236,7 @@ class TrainingTab extends JPanel
 			: method.isPickable() ? Color.WHITE
 			: ColorScheme.MEDIUM_GRAY_COLOR;
 		StringBuilder text = new StringBuilder(Html.color(color, Html.escape(method.getName()) + (picked ? " (picked)" : "")))
-			.append("<br>Level ").append(method.getLevel())
-			.append(" · ").append(Format.number(method.getXpHr())).append(" xp/hr")
-			.append(" · ").append(Format.gpPerXp(method.getGpPerXp()));
+			.append("<br>").append(Html.parts("Level " + method.getLevel(), Format.number(method.getXpHr()) + " xp/hr", Format.gpPerXp(method.getGpPerXp())));
 		if (!method.isPickable() && !method.getBlockers().isEmpty())
 		{
 			text.append("<br>").append(Html.color(Html.RED, Html.escape(String.join(", ", method.getBlockers()))));

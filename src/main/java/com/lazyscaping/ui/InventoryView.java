@@ -67,7 +67,7 @@ final class InventoryView
 		List<InventorySlot> slots = setup.getInventory();
 		int size = setup.getInventorySize() > 0 ? setup.getInventorySize() : DEFAULT_SIZE;
 		parent.add(Components.subheading("Inventory"));
-		parent.add(Components.label(Html.muted(slots.size() + "/" + size + " slots · supplies " + Format.gp(setup.getTripCost()) + " a trip")));
+		parent.add(Components.label(Html.muted(Html.parts(slots.size() + "/" + size + " slots", "supplies " + Format.gp(setup.getTripCost()) + " a trip"))));
 		parent.add(Components.label(slotCounts(slots)));
 		parent.add(Components.spaced(grid(slots, size, setup.getRunePouch(), icons), 6));
 
@@ -89,7 +89,7 @@ final class InventoryView
 		Map<Kind, Integer> counts = new EnumMap<>(Kind.class);
 		slots.forEach(slot -> counts.merge(Kind.of(slot.getKind()), 1, Integer::sum));
 		return counts.entrySet().stream()
-			.map(e -> Html.color(e.getKey().color, e.getValue() + " " + (e.getValue() == 1 ? e.getKey().singular : e.getKey().plural)))
+			.map(e -> Html.color(e.getKey().color, Html.keep(e.getValue() + " " + (e.getValue() == 1 ? e.getKey().singular : e.getKey().plural))))
 			.collect(Collectors.joining(" · "));
 	}
 

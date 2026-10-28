@@ -48,9 +48,8 @@ final class MethodDetails
 
 	private void addSummary(TrainingMethod method)
 	{
-		addText(Format.effort(method.getAfk()) + " · " + Format.gpPerXp(method.getGpPerXp())
-			+ (method.isMembers() ? " · Members" : "")
-			+ (method.isIronFriendly() ? "" : " · Hard for ironmen"), 0);
+		addText(Html.parts(Format.effort(method.getAfk()), Format.gpPerXp(method.getGpPerXp()),
+			method.isMembers() ? "Members" : "", method.isIronFriendly() ? "" : "Hard for ironmen"), 0);
 		if (method.getNotes() != null)
 		{
 			addText(Html.escape(method.getNotes()), 4);

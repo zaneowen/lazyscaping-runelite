@@ -80,7 +80,8 @@ public interface LazyScapingConfig extends Config
 	@ConfigItem(
 		keyName = "houseTeleports",
 		name = "House teleports",
-		description = "What your house has. Gear setups use a house teleport instead of these teleports.",
+		description = "What your house has. Gear setups use a house teleport instead of the teleports these replace,<br>"
+			+ "and a fairy ring or spirit tree replaces a boss's teleport when it can get you there.",
 		section = accountSection,
 		position = 5
 	)
