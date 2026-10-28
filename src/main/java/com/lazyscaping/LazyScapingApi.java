@@ -100,29 +100,6 @@ class LazyScapingApi
 		List<MethodOption> options;
 	}
 
-	static class MissingLevel
-	{
-		String skill;
-		int have;
-		int need;
-	}
-
-	static class BossSuggestion
-	{
-		String id;
-		String name;
-		/** "ready" or "close". */
-		String readiness;
-		String style;
-		List<MissingLevel> missing;
-		boolean gearShort;
-	}
-
-	static class Bosses
-	{
-		List<BossSuggestion> bosses;
-	}
-
 	static class GearItem
 	{
 		/** The site's gear id. */
@@ -243,11 +220,6 @@ class LazyScapingApi
 	void plan(JsonObject body, Consumer<Plan> done, Consumer<String> failed)
 	{
 		send(post("/api/plugin/plan", body), Plan.class, done, failed);
-	}
-
-	void bosses(JsonObject body, Consumer<Bosses> done, Consumer<String> failed)
-	{
-		send(post("/api/plugin/bosses", body), Bosses.class, done, failed);
 	}
 
 	void gear(JsonObject body, Consumer<GearSetup> done, Consumer<String> failed)

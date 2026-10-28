@@ -62,7 +62,7 @@ import okhttp3.HttpUrl;
 
 @PluginDescriptor(
 	name = "LazyScaping",
-	description = "Your training goal, plan and boss suggestions from lazyscaping.app, and one-click sync of your gear and quests",
+	description = "Your training goal, plan and methods, and boss gear setups from lazyscaping.app, with one-click sync of your gear and quests",
 	tags = {"training", "goal", "planner", "xp", "boss", "gear", "bank"}
 )
 @PluginDependency(XpTrackerPlugin.class)
@@ -91,8 +91,8 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 
 	/** How often the goal's xp/hr and time left update, in game ticks (3 seconds). */
 	private static final int PROGRESS_TICKS = 5;
-	/** Bosses are fetched again after a level-up or new gear, at most this often, in game ticks (a minute). */
-	private static final int BOSS_REFRESH_TICKS = 100;
+	/** The gear setup is fetched again after a level-up or new gear, at most this often, in game ticks (a minute). */
+	private static final int GEAR_REFRESH_TICKS = 100;
 
 	/** The site's planner unlocks (see UNLOCKS in src/lib/methods.ts) that come from finishing a quest. */
 	private static final Map<String, Quest> QUEST_UNLOCKS = new LinkedHashMap<>();
@@ -169,10 +169,10 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 	/** Budgets as picked or typed, like "10M", "Unlimited" or "My coins". */
 	private String trainingBudget = DEFAULT_TRAINING_BUDGET;
 	private String gearBudget = DEFAULT_GEAR_BUDGET;
-	/** The gear the boss suggestions were fetched with. */
-	private Set<String> bossGear = Set.of();
-	private boolean bossesStale;
-	private int lastBossFetch = -BOSS_REFRESH_TICKS;
+	/** The gear the gear setup was fetched with. */
+	private Set<String> setupGear = Set.of();
+	private boolean gearStale;
+	private int lastGearFetch = -GEAR_REFRESH_TICKS;
 
 	@Provides
 	LazyScapingConfig provideConfig(ConfigManager configManager)
@@ -254,9 +254,9 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 		{
 			updateProgress();
 		}
-		if (bossesStale && ticks - lastBossFetch >= BOSS_REFRESH_TICKS)
+		if (gearStale && ticks - lastGearFetch >= GEAR_REFRESH_TICKS)
 		{
-			fetchBosses();
+			fetchGear();
 		}
 	}
 
@@ -272,7 +272,7 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 		boolean levelledUp = known != null && known != event.getLevel();
 		if (levelledUp)
 		{
-			bossesStale = true;
+			gearStale = true;
 		}
 		if (skill == goalSkill)
 		{
@@ -297,9 +297,10 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 			long coins = coins();
 			ui(() -> panel.setCoins(coins));
 		}
-		if (player != null && config.liveRecommendations() && (id == InventoryID.BANK || id == InventoryID.WORN || id == InventoryID.INV) && !ownedGear().equals(bossGear))
+		if (player != null && gearBoss != null && config.liveRecommendations()
+			&& (id == InventoryID.BANK || id == InventoryID.WORN || id == InventoryID.INV) && !ownedGear().equals(setupGear))
 		{
-			bossesStale = true;
+			gearStale = true;
 		}
 	}
 
@@ -322,7 +323,7 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 			{
 				planLevel = -1;
 				fetchPlan();
-				fetchBosses();
+				fetchGear();
 			});
 		}
 		else if ("priority".equals(event.getKey()))
@@ -367,12 +368,6 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 	public void openTraining()
 	{
 		clientThread.invoke(() -> openSite("training"));
-	}
-
-	@Override
-	public void openBosses()
-	{
-		clientThread.invoke(() -> openSite("bosses"));
 	}
 
 	@Override
@@ -499,7 +494,7 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 			planLevel = -1;
 			updateProgress();
 			fetchPlan();
-			fetchBosses();
+			fetchGear();
 		});
 	}
 
@@ -537,10 +532,10 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 			panel.setCoins(coins);
 		});
 		planLevel = -1;
-		bossGear = Set.of();
+		setupGear = Set.of();
 		updateProgress();
 		fetchPlan();
-		fetchBosses();
+		fetchGear();
 	}
 
 	private void saveGoal()
@@ -611,28 +606,9 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 		api.plan(body, plan -> ui(() -> panel.showPlan(plan)), error -> ui(() -> panel.showPlanMessage(error)));
 	}
 
-	private void fetchBosses()
-	{
-		bossesStale = false;
-		if (player == null || !config.liveRecommendations())
-		{
-			return;
-		}
-		lastBossFetch = ticks;
-		bossGear = ownedGear();
-		JsonObject body = new JsonObject();
-		body.add("levels", levels());
-		body.add("owned", gson.toJsonTree(bossGear));
-		body.addProperty("members", members());
-
-		ui(() -> panel.showBossesMessage("Finding bosses..."));
-		api.bosses(body, bosses -> ui(() -> panel.showBosses(bosses)), error -> ui(() -> panel.showBossesMessage(error)));
-		// The gear setup depends on the same levels and gear.
-		fetchGear();
-	}
-
 	private void fetchGear()
 	{
+		gearStale = false;
 		if (gearBoss == null)
 		{
 			ui(() -> panel.showGearMessage(null));
@@ -642,6 +618,8 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 		{
 			return;
 		}
+		lastGearFetch = ticks;
+		setupGear = ownedGear();
 		JsonObject body = new JsonObject();
 		body.addProperty("boss", gearBoss);
 		if (gearStyle != null)
@@ -649,7 +627,7 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 			body.addProperty("style", gearStyle);
 		}
 		body.add("levels", levels());
-		body.add("owned", gson.toJsonTree(bossGear));
+		body.add("owned", gson.toJsonTree(setupGear));
 		body.addProperty("members", members());
 		addBudget(body, gearBudget);
 		body.addProperty("ironman", client.getVarbitValue(VarbitID.IRONMAN) != 0);

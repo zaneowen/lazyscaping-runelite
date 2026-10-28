@@ -32,8 +32,8 @@ import net.runelite.client.ui.components.materialtabs.MaterialTab;
 import net.runelite.client.ui.components.materialtabs.MaterialTabGroup;
 
 /**
- * The side panel, with a Training tab (goal and plan) and a Bossing tab (bosses
- * you're ready for and gear setups). Only touched on the Swing thread.
+ * The side panel, with a Training tab (goal, plan and methods) and a Bossing tab
+ * (gear setups). Only touched on the Swing thread.
  */
 class LazyScapingPanel extends PluginPanel
 {
@@ -43,8 +43,6 @@ class LazyScapingPanel extends PluginPanel
 		void goalChanged(Skill skill, int targetLevel);
 
 		void openTraining();
-
-		void openBosses();
 
 		void openBoss(String bossId);
 
@@ -121,13 +119,12 @@ class LazyScapingPanel extends PluginPanel
 	private JComponent gearBudgetRow;
 	/** Coins in the bank and inventory, for the "My coins" budget. */
 	private long coins;
-	private final JPanel bossList = column();
 	private final JComboBox<GearCatalog.Boss> bossBox = new JComboBox<>();
 	private final JComboBox<String> styleBox = new JComboBox<>();
 	/** Holds the style picker; shown when the boss can be fought more than one way. */
 	private JComponent styleRow;
 	private final JPanel gearList = column();
-	private final JLabel liveNotice = wrapped("Turn on <b>Live recommendations</b> in this plugin's settings to see your training plan, boss suggestions and gear setups.");
+	private final JLabel liveNotice = wrapped("Turn on <b>Live recommendations</b> in this plugin's settings to see your training plan and boss gear setups.");
 	/** Set while the goal controls are changed in code, so they don't report it as the player's choice. */
 	private boolean settingGoal;
 	/** The same for the gear setup's boss and style pickers. */
@@ -225,16 +222,9 @@ class LazyScapingPanel extends PluginPanel
 	{
 		JPanel tab = column();
 
-		JPanel suggestions = card("Bosses for you");
-		suggestions.add(bossList);
-		suggestions.add(gap(4));
-		JButton all = button("All boss suggestions");
-		all.addActionListener(e -> actions.openBosses());
-		suggestions.add(full(all));
-		tab.add(suggestions);
-		tab.add(gap(8));
-
 		JPanel setup = card("Gear setup");
+		setup.add(wrapped("<font color='" + MUTED + "'>Pick a boss to see the best setup from your gear.</font>"));
+		setup.add(gap(4));
 		bossBox.addItem(CHOOSE_BOSS);
 		// Sized like this, not by the longest boss name, so it fits the panel.
 		bossBox.setPrototypeDisplayValue(CHOOSE_BOSS);
@@ -279,13 +269,12 @@ class LazyScapingPanel extends PluginPanel
 
 	void setLoggedIn(boolean loggedIn)
 	{
-		status.setText(loggedIn ? "" : "Log in to see your goal and suggestions.");
+		status.setText(loggedIn ? "" : "Log in to see your goal and gear setups.");
 		status.setVisible(!loggedIn);
 		if (!loggedIn)
 		{
 			showProgress(null);
 			showPlanMessage(null);
-			showBossesMessage(null);
 			showGearMessage(null);
 		}
 	}
@@ -296,8 +285,7 @@ class LazyScapingPanel extends PluginPanel
 		if (!enabled)
 		{
 			showPlanMessage("Needs Live recommendations.");
-			showBossesMessage("Needs Live recommendations.");
-			showGearMessage(null);
+			showGearMessage("Needs Live recommendations.");
 		}
 	}
 
@@ -691,60 +679,6 @@ class LazyScapingPanel extends PluginPanel
 		}
 		String amount = String.format(Locale.ROOT, "%.1f gp/xp", Math.abs(gpPerXp));
 		return gpPerXp > 0 ? "Costs " + amount : "Makes " + amount;
-	}
-
-	void showBosses(LazyScapingApi.Bosses bosses)
-	{
-		bossList.removeAll();
-		if (bosses.bosses == null || bosses.bosses.isEmpty())
-		{
-			bossList.add(wrapped("No bosses fit your levels and gear yet."));
-		}
-		else
-		{
-			bossList.add(wrapped("Click one to see your gear setup."));
-			for (LazyScapingApi.BossSuggestion boss : bosses.bosses)
-			{
-				bossList.add(bossRow(boss));
-			}
-		}
-		refreshLayout(bossList);
-	}
-
-	void showBossesMessage(String message)
-	{
-		showMessage(bossList, message);
-	}
-
-	private JComponent bossRow(LazyScapingApi.BossSuggestion boss)
-	{
-		boolean ready = "ready".equals(boss.readiness);
-		StringBuilder detail = new StringBuilder(ready ? "Ready" : "Almost").append(" · ").append(escape(boss.style));
-		if (boss.missing != null)
-		{
-			for (LazyScapingApi.MissingLevel m : boss.missing)
-			{
-				detail.append(" · ").append(m.need).append(' ').append(escape(m.skill));
-			}
-		}
-		if (boss.gearShort)
-		{
-			detail.append(" · better gear");
-		}
-		JLabel label = wrapped("<font color='" + hex(ready ? READY : GOLD) + "'>" + escape(boss.name) + "</font><br>" + detail);
-		label.setBorder(new EmptyBorder(5, 0, 0, 0));
-		label.setToolTipText("Show your gear setup for " + boss.name);
-		label.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-		label.addMouseListener(new MouseAdapter()
-		{
-			@Override
-			public void mouseClicked(MouseEvent e)
-			{
-				selectBoss(boss.id);
-				actions.bossSelected(boss.id, null);
-			}
-		});
-		return label;
 	}
 
 	void showGear(LazyScapingApi.GearSetup setup)

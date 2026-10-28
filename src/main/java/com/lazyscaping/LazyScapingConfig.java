@@ -34,7 +34,7 @@ public interface LazyScapingConfig extends Config
 	@ConfigItem(
 		keyName = "liveRecommendations",
 		name = "Live recommendations",
-		description = "Fetch training plans and boss suggestions from lazyscaping.app for the panel. Sends your levels,<br>"
+		description = "Fetch training plans and boss gear setups from lazyscaping.app for the panel. Sends your levels,<br>"
 			+ "the gear you own and your quest unlocks. Nothing is stored.",
 		warning = "This feature submits your IP address to a 3rd-party server not controlled or verified by RuneLite developers",
 		position = 1
