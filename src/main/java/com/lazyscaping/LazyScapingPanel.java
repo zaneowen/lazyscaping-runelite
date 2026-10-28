@@ -4,6 +4,7 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Cursor;
+import java.awt.Dimension;
 import java.awt.GridLayout;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
@@ -11,7 +12,6 @@ import java.text.NumberFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
-import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
@@ -22,13 +22,19 @@ import javax.swing.JProgressBar;
 import javax.swing.JSpinner;
 import javax.swing.ListCellRenderer;
 import javax.swing.SpinnerNumberModel;
+import javax.swing.SwingConstants;
 import javax.swing.border.EmptyBorder;
 import net.runelite.api.Skill;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.PluginPanel;
+import net.runelite.client.ui.components.materialtabs.MaterialTab;
+import net.runelite.client.ui.components.materialtabs.MaterialTabGroup;
 
-/** The side panel: the player's training goal and plan, and bosses they're ready for. Only touched on the Swing thread. */
+/**
+ * The side panel, with a Training tab (goal and plan) and a Bossing tab (bosses
+ * you're ready for and gear setups). Only touched on the Swing thread.
+ */
 class LazyScapingPanel extends PluginPanel
 {
 	interface Actions
@@ -48,6 +54,12 @@ class LazyScapingPanel extends PluginPanel
 		void refresh();
 	}
 
+	/** Draws an item's picture into a label, once it's loaded. */
+	interface Icons
+	{
+		void load(LazyScapingApi.GearItem item, boolean dimmed, JLabel target);
+	}
+
 	/** Progress toward the goal, read from the client. */
 	static class Progress
 	{
@@ -63,56 +75,94 @@ class LazyScapingPanel extends PluginPanel
 	private static final String CHOOSE_SKILL = "Choose a skill";
 	private static final GearCatalog.Boss CHOOSE_BOSS = new GearCatalog.Boss(null, "Choose a boss");
 	private static final Color READY = new Color(0x7bc96f);
-	private static final Color CLOSE = new Color(0xd9a23a);
+	private static final Color GOLD = new Color(0xd9a23a);
 	private static final Color MISSING = new Color(0xe0605a);
-	/**
-	 * Width text wraps at, in CSS px: the panel minus its border and some slack. Swing's
-	 * HTML renderer draws CSS px about 4/3 larger, hence the scaling.
-	 */
-	private static final int WRAP_WIDTH = (PANEL_WIDTH - 30) * 3 / 4;
+	private static final String MUTED = "#a8a29e";
 	private static final NumberFormat NUMBER = NumberFormat.getIntegerInstance(Locale.ROOT);
+	/** Space around a card's contents. */
+	private static final int CARD_PADDING = 8;
+	/**
+	 * Width text wraps at inside a card, in CSS px: the panel minus its border, the
+	 * card's padding and some slack. Swing's HTML renderer draws CSS px about 4/3
+	 * larger, hence the scaling.
+	 */
+	private static final int WRAP_WIDTH = (PANEL_WIDTH - 30 - 2 * CARD_PADDING) * 3 / 4;
+	/** Item pictures are drawn in a box this size, like the game's inventory. */
+	private static final Dimension ICON_SIZE = new Dimension(36, 32);
+	/** Text next to an item picture wraps narrower. */
+	private static final int ICON_TEXT_WIDTH = WRAP_WIDTH - (ICON_SIZE.width + 6) * 3 / 4;
 
 	private final Actions actions;
+	private final Icons icons;
 	private final JLabel status = wrapped("");
 	private final JComboBox<String> skillBox = new JComboBox<>();
 	private final JSpinner targetSpinner = new JSpinner(new SpinnerNumberModel(99, 2, 99, 1));
 	private final JProgressBar progressBar = new JProgressBar(0, 1000);
-	private final JLabel xpLeft = small("");
-	private final JLabel rate = small("");
+	private final JLabel xpLeft = wrapped("");
+	private final JLabel rate = wrapped("");
 	private final JPanel planList = column();
 	private final JPanel bossList = column();
 	private final JComboBox<GearCatalog.Boss> bossBox = new JComboBox<>();
 	private final JComboBox<String> styleBox = new JComboBox<>();
-	private final JPanel gearList = column();
 	/** Holds the style picker; shown when the boss can be fought more than one way. */
-	private final JComponent styleRow;
-	private final JLabel liveNotice = wrapped("Turn on <b>Live recommendations</b> in this plugin's settings to see your training plan, boss suggestions and gear setups here.");
+	private JComponent styleRow;
+	private final JPanel gearList = column();
+	private final JLabel liveNotice = wrapped("Turn on <b>Live recommendations</b> in this plugin's settings to see your training plan, boss suggestions and gear setups.");
 	/** Set while the goal controls are changed in code, so they don't report it as the player's choice. */
 	private boolean settingGoal;
 	/** The same for the gear setup's boss and style pickers. */
 	private boolean settingBoss;
 
-	LazyScapingPanel(Actions actions)
+	LazyScapingPanel(Actions actions, Icons icons)
 	{
 		this.actions = actions;
+		this.icons = icons;
 		setBorder(new EmptyBorder(10, 10, 10, 10));
 		setLayout(new BorderLayout());
 
 		JPanel content = column();
 		JLabel title = new JLabel("LazyScaping");
 		title.setFont(FontManager.getRunescapeBoldFont());
-		title.setForeground(CLOSE);
+		title.setForeground(GOLD);
 		content.add(title);
 		content.add(status);
-		content.add(gap());
-
+		content.add(gap(6));
 		JButton sync = button("Open my planner on lazyscaping.app");
 		sync.setToolTipText("Opens the site with your name, gear and quests filled in");
 		sync.addActionListener(e -> actions.openTraining());
 		content.add(full(sync));
-		content.add(gap());
+		content.add(gap(8));
 
-		content.add(heading("Training goal"));
+		// Training and Bossing each get a tab.
+		JPanel display = new JPanel(new BorderLayout());
+		MaterialTabGroup tabs = new MaterialTabGroup(display);
+		tabs.setLayout(new GridLayout(1, 2, 4, 0));
+		tabs.setBorder(new EmptyBorder(0, 0, 8, 0));
+		MaterialTab training = new MaterialTab("Training", tabs, trainingTab());
+		MaterialTab bossing = new MaterialTab("Bossing", tabs, bossingTab());
+		tabs.addTab(training);
+		tabs.addTab(bossing);
+		tabs.select(training);
+		content.add(tabs);
+		content.add(display);
+
+		content.add(gap(8));
+		content.add(liveNotice);
+		content.add(gap(4));
+		JButton refresh = button("Refresh");
+		refresh.addActionListener(e -> actions.refresh());
+		content.add(full(refresh));
+
+		styleRow.setVisible(false);
+		add(content, BorderLayout.NORTH);
+		setLoggedIn(false);
+	}
+
+	private JComponent trainingTab()
+	{
+		JPanel tab = column();
+
+		JPanel goal = card("Training goal");
 		skillBox.addItem(CHOOSE_SKILL);
 		for (Skill skill : LazyScapingPlugin.SKILLS)
 		{
@@ -120,28 +170,41 @@ class LazyScapingPanel extends PluginPanel
 		}
 		skillBox.addActionListener(e -> goalEdited());
 		targetSpinner.addChangeListener(e -> goalEdited());
+		targetSpinner.setToolTipText("Target level");
 		JPanel goalRow = new JPanel(new BorderLayout(6, 0));
+		goalRow.setOpaque(false);
 		goalRow.add(skillBox, BorderLayout.CENTER);
 		goalRow.add(targetSpinner, BorderLayout.EAST);
-		content.add(full(goalRow));
+		goal.add(full(goalRow));
 		progressBar.setStringPainted(true);
-		progressBar.setForeground(CLOSE);
+		progressBar.setForeground(GOLD);
 		progressBar.setBackground(ColorScheme.DARK_GRAY_COLOR);
-		content.add(full(progressBar));
-		content.add(xpLeft);
-		content.add(rate);
-		content.add(gap());
-		content.add(planList);
-		content.add(gap());
+		goal.add(full(progressBar));
+		goal.add(xpLeft);
+		goal.add(rate);
+		tab.add(goal);
+		tab.add(gap(8));
 
-		content.add(heading("Bosses for you"));
-		content.add(bossList);
-		JButton bosses = button("All boss suggestions");
-		bosses.addActionListener(e -> actions.openBosses());
-		content.add(full(bosses));
-		content.add(gap());
+		JPanel plan = card("Your plan");
+		plan.add(planList);
+		tab.add(plan);
+		return tab;
+	}
 
-		content.add(heading("Gear setup"));
+	private JComponent bossingTab()
+	{
+		JPanel tab = column();
+
+		JPanel suggestions = card("Bosses for you");
+		suggestions.add(bossList);
+		suggestions.add(gap(4));
+		JButton all = button("All boss suggestions");
+		all.addActionListener(e -> actions.openBosses());
+		suggestions.add(full(all));
+		tab.add(suggestions);
+		tab.add(gap(8));
+
+		JPanel setup = card("Gear setup");
 		bossBox.addItem(CHOOSE_BOSS);
 		// Sized like this, not by the longest boss name, so it fits the panel.
 		bossBox.setPrototypeDisplayValue(CHOOSE_BOSS);
@@ -152,7 +215,7 @@ class LazyScapingPanel extends PluginPanel
 			Component c = renderer.getListCellRendererComponent(list, boss, index, selected, focused);
 			if (index >= 0 && boss != null && c instanceof JLabel)
 			{
-				((JLabel) c).setText(html(escape(boss.name)));
+				((JLabel) c).setText(html(escape(boss.name), WRAP_WIDTH));
 			}
 			return c;
 		});
@@ -160,11 +223,11 @@ class LazyScapingPanel extends PluginPanel
 		bossBox.addActionListener(e -> bossEdited(false));
 		styleBox.addActionListener(e -> bossEdited(true));
 		styleBox.setToolTipText("Combat style");
-		content.add(full(bossBox));
+		setup.add(full(bossBox));
 		styleRow = full(styleBox);
-		styleRow.setVisible(false);
-		content.add(styleRow);
-		content.add(gearList);
+		setup.add(styleRow);
+		setup.add(gearList);
+		setup.add(gap(4));
 		JButton fullPlan = button("Full gear plan on lazyscaping.app");
 		fullPlan.addActionListener(e ->
 		{
@@ -174,16 +237,9 @@ class LazyScapingPanel extends PluginPanel
 				actions.openBoss(boss.id);
 			}
 		});
-		content.add(full(fullPlan));
-		content.add(gap());
-
-		content.add(liveNotice);
-		JButton refresh = new JButton("Refresh");
-		refresh.addActionListener(e -> actions.refresh());
-		content.add(full(refresh));
-
-		add(content, BorderLayout.NORTH);
-		setLoggedIn(false);
+		setup.add(full(fullPlan));
+		tab.add(setup);
+		return tab;
 	}
 
 	void setLoggedIn(boolean loggedIn)
@@ -204,10 +260,31 @@ class LazyScapingPanel extends PluginPanel
 		liveNotice.setVisible(!enabled);
 		if (!enabled)
 		{
-			showPlanMessage(null);
-			showBossesMessage(null);
+			showPlanMessage("Needs Live recommendations.");
+			showBossesMessage("Needs Live recommendations.");
 			showGearMessage(null);
 		}
+	}
+
+	/** Shows a goal without reporting it back as a change. */
+	void setGoal(Skill skill, int targetLevel)
+	{
+		settingGoal = true;
+		skillBox.setSelectedItem(skill == null ? CHOOSE_SKILL : skill.getName());
+		targetSpinner.setValue(targetLevel);
+		targetSpinner.setEnabled(skill != null);
+		settingGoal = false;
+	}
+
+	private void goalEdited()
+	{
+		if (settingGoal)
+		{
+			return;
+		}
+		Skill skill = LazyScapingPlugin.skillNamed((String) skillBox.getSelectedItem());
+		targetSpinner.setEnabled(skill != null);
+		actions.goalChanged(skill, (Integer) targetSpinner.getValue());
 	}
 
 	/** The bosses the gear setup can be picked for, keeping the current pick. */
@@ -245,38 +322,11 @@ class LazyScapingPanel extends PluginPanel
 			return;
 		}
 		GearCatalog.Boss boss = (GearCatalog.Boss) bossBox.getSelectedItem();
-		String bossId = boss == null ? null : boss.id;
 		if (!styleChanged)
 		{
 			styleRow.setVisible(false);
 		}
-		actions.bossSelected(bossId, styleChanged ? (String) styleBox.getSelectedItem() : null);
-	}
-
-	/** Shows a goal without reporting it back as a change. */
-	void setGoal(Skill skill, int targetLevel)
-	{
-		settingGoal = true;
-		skillBox.setSelectedItem(skill == null ? CHOOSE_SKILL : skill.getName());
-		targetSpinner.setValue(targetLevel);
-		targetSpinner.setEnabled(skill != null);
-		settingGoal = false;
-	}
-
-	private void goalEdited()
-	{
-		if (settingGoal)
-		{
-			return;
-		}
-		Skill skill = selectedSkill();
-		targetSpinner.setEnabled(skill != null);
-		actions.goalChanged(skill, (Integer) targetSpinner.getValue());
-	}
-
-	private Skill selectedSkill()
-	{
-		return LazyScapingPlugin.skillNamed((String) skillBox.getSelectedItem());
+		actions.bossSelected(boss == null ? null : boss.id, styleChanged ? (String) styleBox.getSelectedItem() : null);
 	}
 
 	void showProgress(Progress p)
@@ -313,18 +363,19 @@ class LazyScapingPanel extends PluginPanel
 		planList.removeAll();
 		if (plan.goalReached || plan.steps == null || plan.steps.isEmpty())
 		{
-			planList.add(small(plan.goalReached ? "" : "No methods fit this goal yet."));
+			planList.add(wrapped(plan.goalReached ? "Goal reached." : "No methods fit this goal yet."));
 		}
 		else
 		{
-			planList.add(small("LazyScaping plan · about " + hours(plan.totalHours)
-				+ (plan.totalCost > 0 ? " · costs " + gp(plan.totalCost) : plan.totalCost < 0 ? " · makes " + gp(-plan.totalCost) : "")));
+			String cost = plan.totalCost > 0 ? " · costs " + gp(plan.totalCost) : plan.totalCost < 0 ? " · makes " + gp(-plan.totalCost) : "";
+			planList.add(wrapped("About " + hours(plan.totalHours) + cost));
 			for (LazyScapingApi.PlanStep step : plan.steps)
 			{
-				JLabel label = wrapped("<b>" + step.fromLevel + "-" + step.toLevel + "</b> " + escape(step.method)
-					+ "<br><font color='#a8a29e'>" + NUMBER.format(step.xpHr) + " xp/hr · " + hours(step.hours) + "</font>");
+				JLabel label = wrapped("<font color='#ffffff'>Level " + step.fromLevel + "-" + step.toLevel + "</font><br>"
+					+ "<font color='" + hex(GOLD) + "'>" + escape(step.method) + "</font><br>"
+					+ NUMBER.format(step.xpHr) + " xp/hr · " + hours(step.hours));
 				label.setToolTipText(step.notes);
-				label.setBorder(new EmptyBorder(4, 0, 0, 0));
+				label.setBorder(new EmptyBorder(6, 0, 0, 0));
 				planList.add(label);
 			}
 		}
@@ -333,12 +384,7 @@ class LazyScapingPanel extends PluginPanel
 
 	void showPlanMessage(String message)
 	{
-		planList.removeAll();
-		if (message != null)
-		{
-			planList.add(small(message));
-		}
-		refreshLayout(planList);
+		showMessage(planList, message);
 	}
 
 	void showBosses(LazyScapingApi.Bosses bosses)
@@ -346,10 +392,11 @@ class LazyScapingPanel extends PluginPanel
 		bossList.removeAll();
 		if (bosses.bosses == null || bosses.bosses.isEmpty())
 		{
-			bossList.add(small("No bosses fit your levels and gear yet."));
+			bossList.add(wrapped("No bosses fit your levels and gear yet."));
 		}
 		else
 		{
+			bossList.add(wrapped("Click one to see your gear setup."));
 			for (LazyScapingApi.BossSuggestion boss : bosses.bosses)
 			{
 				bossList.add(bossRow(boss));
@@ -360,12 +407,38 @@ class LazyScapingPanel extends PluginPanel
 
 	void showBossesMessage(String message)
 	{
-		bossList.removeAll();
-		if (message != null)
+		showMessage(bossList, message);
+	}
+
+	private JComponent bossRow(LazyScapingApi.BossSuggestion boss)
+	{
+		boolean ready = "ready".equals(boss.readiness);
+		StringBuilder detail = new StringBuilder(ready ? "Ready" : "Almost").append(" · ").append(escape(boss.style));
+		if (boss.missing != null)
 		{
-			bossList.add(small(message));
+			for (LazyScapingApi.MissingLevel m : boss.missing)
+			{
+				detail.append(" · ").append(m.need).append(' ').append(escape(m.skill));
+			}
 		}
-		refreshLayout(bossList);
+		if (boss.gearShort)
+		{
+			detail.append(" · better gear");
+		}
+		JLabel label = wrapped("<font color='" + hex(ready ? READY : GOLD) + "'>" + escape(boss.name) + "</font><br>" + detail);
+		label.setBorder(new EmptyBorder(5, 0, 0, 0));
+		label.setToolTipText("Show your gear setup for " + boss.name);
+		label.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+		label.addMouseListener(new MouseAdapter()
+		{
+			@Override
+			public void mouseClicked(MouseEvent e)
+			{
+				selectBoss(boss.id);
+				actions.bossSelected(boss.id, null);
+			}
+		});
+		return label;
 	}
 
 	void showGear(LazyScapingApi.GearSetup setup)
@@ -381,14 +454,15 @@ class LazyScapingPanel extends PluginPanel
 		settingBoss = false;
 
 		gearList.removeAll();
+		String name = setup.boss != null ? setup.boss.name : "";
+		gearList.add(wrapped("<font color='#ffffff'>" + escape(name) + "</font><br>" + escape(setup.style) + " · from the gear you own"));
 		if (setup.noGear != null)
 		{
 			gearList.add(wrapped(escape(setup.noGear)));
 		}
 		else
 		{
-			String name = setup.boss != null ? setup.boss.name : "";
-			gearList.add(wrapped("<font color='#ffffff'>" + escape(name) + "</font><br>" + escape(setup.style) + " · from the gear you own"));
+			gearList.add(costSummary(setup));
 			addSlots(setup.picks);
 			if (setup.switches != null)
 			{
@@ -406,7 +480,7 @@ class LazyScapingPanel extends PluginPanel
 		}
 		if (setup.supplies != null && !setup.supplies.isEmpty())
 		{
-			gearList.add(subheading("Inventory"));
+			gearList.add(subheading("Inventory · " + gp(setup.tripCost) + " a trip"));
 			gearList.add(wrapped(lines(setup.supplies)));
 		}
 		if (setup.utility != null && !setup.utility.isEmpty())
@@ -426,12 +500,60 @@ class LazyScapingPanel extends PluginPanel
 
 	void showGearMessage(String message)
 	{
-		gearList.removeAll();
-		if (message != null)
+		showMessage(gearList, message);
+	}
+
+	/** What filling the empty slots would cost on the GE. */
+	private JComponent costSummary(LazyScapingApi.GearSetup setup)
+	{
+		long cost = 0;
+		int untradeable = 0;
+		int empty = 0;
+		for (LazyScapingApi.GearSlot s : allSlots(setup))
 		{
-			gearList.add(small(message));
+			if (s.item == null && s.next != null && !"twoHanded".equals(s.status))
+			{
+				empty++;
+				if (s.next.price != null)
+				{
+					cost += s.next.price;
+				}
+				else
+				{
+					untradeable++;
+				}
+			}
 		}
-		refreshLayout(gearList);
+		if (empty == 0)
+		{
+			return wrapped("<font color='" + hex(READY) + "'>Every slot filled from your gear.</font>");
+		}
+		String text = "Filling " + empty + " empty slot" + (empty == 1 ? "" : "s") + ": <font color='" + hex(GOLD) + "'>" + gp(cost) + "</font>";
+		if (untradeable > 0)
+		{
+			text += " + " + untradeable + " untradeable";
+		}
+		JLabel label = wrapped(text);
+		label.setBorder(new EmptyBorder(4, 0, 2, 0));
+		return label;
+	}
+
+	private static List<LazyScapingApi.GearSlot> allSlots(LazyScapingApi.GearSetup setup)
+	{
+		List<LazyScapingApi.GearSlot> out = new java.util.ArrayList<>();
+		if (setup.picks != null)
+		{
+			out.addAll(setup.picks);
+		}
+		if (setup.switches != null)
+		{
+			setup.switches.forEach(sw -> out.addAll(sw.picks));
+		}
+		if (setup.spec != null)
+		{
+			out.add(setup.spec);
+		}
+		return out;
 	}
 
 	private void addSlots(List<LazyScapingApi.GearSlot> slots)
@@ -442,31 +564,58 @@ class LazyScapingPanel extends PluginPanel
 		}
 		for (LazyScapingApi.GearSlot s : slots)
 		{
-			StringBuilder html = new StringBuilder("<font color='#a8a29e'>").append(escape(s.slot)).append(":</font> ");
-			if ("twoHanded".equals(s.status))
-			{
-				html.append("<font color='#a8a29e'>two-handed weapon</font>");
-			}
-			else if (s.item != null)
-			{
-				html.append("<font color='").append(hex(READY)).append("'>").append(escape(s.item)).append("</font>");
-				if (s.next != null)
-				{
-					html.append("<br><font color='#a8a29e'>upgrade: ").append(escape(s.next)).append("</font>");
-				}
-			}
-			else
-			{
-				html.append(s.missingRequired ? "<font color='" + hex(MISSING) + "'>needed</font>" : "<font color='#a8a29e'>empty</font>");
-				if (s.next != null)
-				{
-					html.append(" · get <font color='").append(hex(CLOSE)).append("'>").append(escape(s.next)).append("</font>");
-				}
-			}
-			JLabel label = wrapped(html.toString());
-			label.setBorder(new EmptyBorder(1, 0, 1, 0));
-			gearList.add(label);
+			gearList.add(slotRow(s));
 		}
+	}
+
+	/** One gear slot: the item's picture, then the slot, item and what to get next. */
+	private JComponent slotRow(LazyScapingApi.GearSlot s)
+	{
+		JLabel picture = new JLabel();
+		picture.setPreferredSize(ICON_SIZE);
+		picture.setMinimumSize(ICON_SIZE);
+		picture.setHorizontalAlignment(SwingConstants.CENTER);
+		picture.setVerticalAlignment(SwingConstants.TOP);
+
+		StringBuilder text = new StringBuilder("<font color='").append(MUTED).append("'>").append(escape(s.slot)).append("</font><br>");
+		if ("twoHanded".equals(s.status))
+		{
+			text.append("<font color='").append(MUTED).append("'>Two-handed weapon</font>");
+		}
+		else if (s.item != null)
+		{
+			text.append("<font color='").append(hex(READY)).append("'>").append(escape(s.item.name)).append("</font>");
+			if (s.next != null)
+			{
+				text.append("<br><font color='").append(MUTED).append("'>Upgrade: ").append(escape(s.next.name)).append(price(s.next)).append("</font>");
+			}
+			icons.load(s.item, false, picture);
+		}
+		else if (s.next != null)
+		{
+			Color color = s.missingRequired ? MISSING : GOLD;
+			text.append("<font color='").append(hex(color)).append("'>").append(s.missingRequired ? "Needed: " : "Get: ")
+				.append(escape(s.next.name)).append("</font><br><font color='").append(MUTED).append("'>")
+				.append(s.next.price != null ? gp(s.next.price) : "Untradeable").append("</font>");
+			// The item to get, faded, since you don't have it yet.
+			icons.load(s.next, true, picture);
+		}
+		else
+		{
+			text.append("<font color='").append(MUTED).append("'>Empty</font>");
+		}
+
+		JPanel row = new JPanel(new BorderLayout(6, 0));
+		row.setOpaque(false);
+		row.setBorder(new EmptyBorder(4, 0, 0, 0));
+		row.add(picture, BorderLayout.WEST);
+		row.add(wrapped(text.toString(), ICON_TEXT_WIDTH), BorderLayout.CENTER);
+		return row;
+	}
+
+	private static String price(LazyScapingApi.GearItem item)
+	{
+		return item.price != null ? " · " + gp(item.price) : "";
 	}
 
 	private static String lines(List<LazyScapingApi.ItemLine> lines)
@@ -476,47 +625,29 @@ class LazyScapingPanel extends PluginPanel
 		{
 			if (out.length() > 0)
 			{
-				out.append(", ");
+				out.append("<br>");
 			}
 			if (line.qty > 1)
 			{
-				out.append(line.qty).append(' ');
+				out.append(line.qty).append(" x ");
 			}
 			out.append(escape(line.name));
+			if (line.cost != null && line.cost > 0)
+			{
+				out.append(" <font color='").append(MUTED).append("'>· ").append(gp(line.cost)).append("</font>");
+			}
 		}
 		return out.toString();
 	}
 
-	private JComponent bossRow(LazyScapingApi.BossSuggestion boss)
+	private void showMessage(JPanel list, String message)
 	{
-		boolean ready = "ready".equals(boss.readiness);
-		StringBuilder detail = new StringBuilder(ready ? "Ready" : "Almost").append(" · ").append(escape(boss.style));
-		if (boss.missing != null)
+		list.removeAll();
+		if (message != null)
 		{
-			for (LazyScapingApi.MissingLevel m : boss.missing)
-			{
-				detail.append(" · ").append(m.need).append(' ').append(escape(m.skill));
-			}
+			list.add(wrapped(message));
 		}
-		if (boss.gearShort)
-		{
-			detail.append(" · better gear");
-		}
-		JLabel label = wrapped("<font color='" + hex(ready ? READY : CLOSE) + "'>" + escape(boss.name) + "</font>"
-			+ "<br><font color='#a8a29e'>" + detail + "</font>");
-		label.setBorder(new EmptyBorder(3, 0, 3, 0));
-		label.setToolTipText("Show your gear setup for " + boss.name);
-		label.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-		label.addMouseListener(new MouseAdapter()
-		{
-			@Override
-			public void mouseClicked(MouseEvent e)
-			{
-				selectBoss(boss.id);
-				actions.bossSelected(boss.id, null);
-			}
-		});
-		return label;
+		refreshLayout(list);
 	}
 
 	private void refreshLayout(JComponent changed)
@@ -535,17 +666,21 @@ class LazyScapingPanel extends PluginPanel
 		return minutes / 60 + "h " + String.format(Locale.ROOT, "%02d", minutes % 60) + "m";
 	}
 
-	private static String gp(long gp)
+	static String gp(long gp)
 	{
+		if (gp >= 1_000_000_000)
+		{
+			return String.format(Locale.ROOT, "%.2fB gp", gp / 1_000_000_000.0);
+		}
 		if (gp >= 1_000_000)
 		{
-			return String.format(Locale.ROOT, "%.1fM gp", gp / 1_000_000.0);
+			return String.format(Locale.ROOT, "%.2fM gp", gp / 1_000_000.0);
 		}
-		if (gp >= 1_000)
+		if (gp >= 10_000)
 		{
-			return Math.round(gp / 1_000.0) + "k gp";
+			return String.format(Locale.ROOT, "%.1fk gp", gp / 1_000.0);
 		}
-		return gp + " gp";
+		return NUMBER.format(gp) + " gp";
 	}
 
 	private static String escape(String text)
@@ -574,63 +709,69 @@ class LazyScapingPanel extends PluginPanel
 			}
 		};
 		panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+		panel.setOpaque(false);
 		return panel;
+	}
+
+	/** A shaded box with a title, for one section of a tab. */
+	private static JPanel card(String title)
+	{
+		JPanel card = column();
+		card.setOpaque(true);
+		card.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+		card.setBorder(new EmptyBorder(CARD_PADDING, CARD_PADDING, CARD_PADDING, CARD_PADDING));
+		JLabel heading = new JLabel(title);
+		heading.setFont(FontManager.getRunescapeBoldFont());
+		heading.setForeground(Color.WHITE);
+		heading.setBorder(new EmptyBorder(0, 0, 6, 0));
+		card.add(heading);
+		return card;
 	}
 
 	/** Stretches a component across the panel. */
 	private static JComponent full(JComponent c)
 	{
 		JPanel row = new JPanel(new GridLayout(1, 1));
+		row.setOpaque(false);
 		row.setBorder(new EmptyBorder(2, 0, 2, 0));
 		row.add(c);
 		return row;
 	}
 
-	private static JLabel heading(String text)
-	{
-		JLabel label = new JLabel(text);
-		label.setFont(FontManager.getRunescapeBoldFont());
-		label.setForeground(Color.WHITE);
-		label.setBorder(BorderFactory.createEmptyBorder(0, 0, 4, 0));
-		return label;
-	}
-
 	private static JLabel subheading(String text)
 	{
-		JLabel label = new JLabel(text);
-		label.setFont(FontManager.getRunescapeSmallFont());
-		label.setForeground(Color.WHITE);
-		label.setBorder(new EmptyBorder(6, 0, 1, 0));
+		JLabel label = wrapped("<font color='#ffffff'>" + escape(text) + "</font>");
+		label.setBorder(new EmptyBorder(10, 0, 0, 0));
 		return label;
 	}
 
-	private static JLabel small(String text)
+	/** Text (which may contain HTML) wrapped to a width in CSS px. */
+	private static String html(String text, int width)
 	{
-		return wrapped(text);
-	}
-
-	/** Text (which may contain HTML) wrapped to fit the panel, leaving room for the border and scrollbar. */
-	private static String html(String text)
-	{
-		return "<html><body style='width:" + WRAP_WIDTH + "px'>" + text + "</body></html>";
+		return "<html><body style='width:" + width + "px'>" + text + "</body></html>";
 	}
 
 	/** A button whose label wraps instead of being cut off. */
 	private static JButton button(String text)
 	{
 		// Narrower than other text, to leave room for the button's padding.
-		return new JButton("<html><body style='width:" + (WRAP_WIDTH - 25) + "px;text-align:center'>" + escape(text) + "</body></html>");
+		return new JButton("<html><body style='width:" + (WRAP_WIDTH - 15) + "px;text-align:center'>" + escape(text) + "</body></html>");
 	}
 
-	/** A label whose text wraps to the panel's width. Text may contain HTML. */
 	private static JLabel wrapped(String text)
 	{
-		JLabel label = new JLabel(html(text))
+		return wrapped(text, WRAP_WIDTH);
+	}
+
+	/** A label whose text wraps to a width. Text may contain HTML. */
+	private static JLabel wrapped(String text, int width)
+	{
+		JLabel label = new JLabel(html(text, width))
 		{
 			@Override
 			public void setText(String text)
 			{
-				super.setText(text == null || text.isEmpty() || text.startsWith("<html>") ? text : html(text));
+				super.setText(text == null || text.isEmpty() || text.startsWith("<html>") ? text : html(text, width));
 			}
 		};
 		label.setFont(FontManager.getRunescapeSmallFont());
@@ -638,10 +779,12 @@ class LazyScapingPanel extends PluginPanel
 		return label;
 	}
 
-	private static JComponent gap()
+	private static JComponent gap(int height)
 	{
 		JPanel gap = new JPanel();
-		gap.setBorder(new EmptyBorder(6, 0, 0, 0));
+		gap.setOpaque(false);
+		gap.setBorder(new EmptyBorder(height, 0, 0, 0));
+		gap.setMaximumSize(new Dimension(Integer.MAX_VALUE, height));
 		return gap;
 	}
 }

@@ -2,9 +2,11 @@ package com.lazyscaping;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.util.List;
 import java.util.function.Consumer;
+import javax.imageio.ImageIO;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import org.slf4j.Logger;
@@ -80,15 +82,28 @@ class LazyScapingApi
 		List<BossSuggestion> bosses;
 	}
 
+	static class GearItem
+	{
+		/** The site's gear id. */
+		String id;
+		String name;
+		/** The game's item id, for tradeable items. */
+		Integer itemId;
+		/** The site's picture of the item, a path like /images/wiki/fire-cape.png. */
+		String icon;
+		/** GE price, null when untradeable. Ammo is priced for one trip. */
+		Long price;
+	}
+
 	static class GearSlot
 	{
 		String slot;
-		/** The best item you own for the slot, or null. */
-		String item;
 		/** "owned", "none" or "twoHanded" (the weapon takes this slot). */
 		String status;
+		/** The best item you own for the slot, or null. */
+		GearItem item;
 		/** The next item to work towards. */
-		String next;
+		GearItem next;
 		/** The boss needs a specific item here, like an anti-dragon shield. */
 		boolean missingRequired;
 	}
@@ -104,6 +119,8 @@ class LazyScapingApi
 		String name;
 		int qty;
 		String why;
+		/** GE cost for one trip, null when it can't be bought. */
+		Long cost;
 	}
 
 	static class GearSetup
@@ -118,6 +135,52 @@ class LazyScapingApi
 		GearSlot spec;
 		List<ItemLine> supplies;
 		List<ItemLine> utility;
+		/** GE cost of the supplies and utility items for one trip. */
+		long tripCost;
+	}
+
+	/** One of the site's item pictures, for items the game can't draw by id. */
+	void image(String path, Consumer<BufferedImage> done)
+	{
+		HttpUrl url = SITE.resolve(path);
+		if (url == null || !url.host().equals(SITE.host()))
+		{
+			return;
+		}
+		http.newCall(new Request.Builder().url(url).build()).enqueue(new Callback()
+		{
+			@Override
+			public void onFailure(Call call, IOException e)
+			{
+				log.debug("LazyScaping image failed: {}", url, e);
+			}
+
+			@Override
+			public void onResponse(Call call, Response response)
+			{
+				try (ResponseBody body = response.body())
+				{
+					if (!response.isSuccessful() || body == null)
+					{
+						return;
+					}
+					BufferedImage image;
+					// ImageIO isn't thread-safe.
+					synchronized (ImageIO.class)
+					{
+						image = ImageIO.read(body.byteStream());
+					}
+					if (image != null)
+					{
+						done.accept(image);
+					}
+				}
+				catch (IOException e)
+				{
+					log.debug("Bad LazyScaping image: {}", url, e);
+				}
+			}
+		});
 	}
 
 	void catalog(Consumer<GearCatalog> done)

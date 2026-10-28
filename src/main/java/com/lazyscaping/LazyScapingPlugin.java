@@ -4,18 +4,25 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.inject.Provides;
+import java.awt.AlphaComposite;
+import java.awt.Graphics2D;
+import java.awt.image.BufferedImage;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
+import javax.swing.ImageIcon;
+import javax.swing.JLabel;
 import javax.swing.SwingUtilities;
 import net.runelite.api.Client;
 import net.runelite.api.Experience;
@@ -45,6 +52,7 @@ import net.runelite.client.plugins.xptracker.XpTrackerPlugin;
 import net.runelite.client.plugins.xptracker.XpTrackerService;
 import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.NavigationButton;
+import net.runelite.client.util.AsyncBufferedImage;
 import net.runelite.client.util.ImageUtil;
 import net.runelite.client.util.LinkBrowser;
 import okhttp3.HttpUrl;
@@ -125,6 +133,10 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 	private NavigationButton navButton;
 	/** Replaced by the site's current catalog when live recommendations are on. */
 	private volatile GearCatalog catalog;
+	/** The item id of each piece of gear you own, so pictures show your version. */
+	private volatile Map<String, Integer> ownedItemIds = Map.of();
+	/** The site's pictures of untradeable items, by path. */
+	private final Map<String, BufferedImage> siteIcons = new ConcurrentHashMap<>();
 
 	// Everything below is only touched on the client thread.
 	/** The logged-in player, once their stats have loaded. */
@@ -155,7 +167,7 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 	protected void startUp()
 	{
 		catalog = GearCatalog.bundled(gson);
-		panel = new LazyScapingPanel(this);
+		panel = new LazyScapingPanel(this, this::loadIcon);
 		navButton = NavigationButton.builder()
 			.tooltip("LazyScaping")
 			.icon(ImageUtil.loadImageResource(getClass(), "panel_icon.png"))
@@ -178,6 +190,7 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 		clientToolbar.removeNavigation(navButton);
 		navButton = null;
 		panel = null;
+		siteIcons.clear();
 		clientThread.invoke(() ->
 		{
 			player = null;
@@ -620,15 +633,70 @@ public class LazyScapingPlugin extends Plugin implements LazyScapingPanel.Action
 				}
 			}
 		}
-		Set<String> names = new HashSet<>();
+		Set<String> owned = new TreeSet<>();
+		Map<String, Integer> itemIds = new HashMap<>();
 		for (int id : ids)
 		{
 			if (id > 0)
 			{
-				names.add(itemManager.getItemComposition(id).getName());
+				String gear = catalog.match(itemManager.getItemComposition(id).getName());
+				if (gear != null)
+				{
+					owned.add(gear);
+					itemIds.put(gear, id);
+				}
 			}
 		}
-		return catalog.matchAll(names);
+		ownedItemIds = itemIds;
+		return owned;
+	}
+
+	/**
+	 * Draws a gear item's picture: the version you own if you have one (like an
+	 * ornament kit), else the game's picture by item id, else the site's picture
+	 * for untradeable items. Faded for items you don't have yet.
+	 */
+	private void loadIcon(LazyScapingApi.GearItem item, boolean dimmed, JLabel target)
+	{
+		Integer owned = ownedItemIds.get(item.id);
+		Integer itemId = owned != null ? owned : item.itemId;
+		if (itemId != null)
+		{
+			AsyncBufferedImage image = itemManager.getImage(itemId);
+			image.onLoaded(() -> SwingUtilities.invokeLater(() -> target.setIcon(icon(image, dimmed))));
+			return;
+		}
+		if (item.icon == null)
+		{
+			return;
+		}
+		BufferedImage cached = siteIcons.get(item.icon);
+		if (cached != null)
+		{
+			target.setIcon(icon(cached, dimmed));
+			return;
+		}
+		api.image(item.icon, image ->
+		{
+			// Wiki pictures vary in size; fit them to an inventory slot.
+			BufferedImage fitted = image.getWidth() > 36 || image.getHeight() > 32 ? ImageUtil.resizeImage(image, 36, 32, true) : image;
+			siteIcons.put(item.icon, fitted);
+			SwingUtilities.invokeLater(() -> target.setIcon(icon(fitted, dimmed)));
+		});
+	}
+
+	private static ImageIcon icon(BufferedImage image, boolean dimmed)
+	{
+		if (!dimmed)
+		{
+			return new ImageIcon(image);
+		}
+		BufferedImage faded = new BufferedImage(image.getWidth(), image.getHeight(), BufferedImage.TYPE_INT_ARGB);
+		Graphics2D g = faded.createGraphics();
+		g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.45f));
+		g.drawImage(image, 0, 0, null);
+		g.dispose();
+		return new ImageIcon(faded);
 	}
 
 	private JsonObject levels()
