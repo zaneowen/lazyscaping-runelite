@@ -45,10 +45,10 @@ class LazyScapingPanel extends PluginPanel
 		void refresh();
 	}
 
-	/** Draws an item's picture into a label, once it's loaded. */
+	/** Draws an item's picture into a label, once it's loaded. A quantity over 1 is drawn on it, like a stack in the inventory. */
 	interface Icons
 	{
-		void load(LazyScapingApi.GearItem item, boolean dimmed, JLabel target);
+		void load(LazyScapingApi.GearItem item, int quantity, boolean dimmed, JLabel target);
 	}
 
 	/** Progress toward the goal, read from the client. */

@@ -40,13 +40,13 @@ class ItemIcons implements LazyScapingPanel.Icons
 	private final Map<String, CompletableFuture<BufferedImage>> siteImages = new ConcurrentHashMap<>();
 
 	@Override
-	public void load(LazyScapingApi.GearItem item, boolean dimmed, JLabel target)
+	public void load(LazyScapingApi.GearItem item, int quantity, boolean dimmed, JLabel target)
 	{
-		Integer ownedId = owned.itemId(item.id);
+		Integer ownedId = item.id != null ? owned.itemId(item.id) : null;
 		Integer itemId = ownedId != null ? ownedId : item.itemId;
 		if (itemId != null)
 		{
-			AsyncBufferedImage image = itemManager.getImage(itemId);
+			AsyncBufferedImage image = itemManager.getImage(itemId, quantity, quantity > 1);
 			image.onLoaded(() -> show(image, dimmed, target));
 			return;
 		}

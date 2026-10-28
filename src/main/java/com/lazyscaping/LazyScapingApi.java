@@ -269,9 +269,10 @@ class LazyScapingApi
 		boolean missingRequired;
 	}
 
+	/** An item the panel draws a picture of. */
 	static class GearItem
 	{
-		/** The site's gear id. */
+		/** The site's gear id; null for supplies and other items that aren't gear. */
 		String id;
 		String name;
 		/** The game's item id, for tradeable items. */
@@ -288,10 +289,11 @@ class LazyScapingApi
 		List<GearSlot> picks;
 	}
 
-	static class ItemLine
+	/** A supply or utility item to bring, with its picture like gear. */
+	static class ItemLine extends GearItem
 	{
-		String name;
 		int qty;
+		/** Why to bring it (utility items only). */
 		String why;
 		/** GE cost for one trip, null when it can't be bought. */
 		Long cost;

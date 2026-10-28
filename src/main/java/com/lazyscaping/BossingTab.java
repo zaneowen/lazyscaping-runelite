@@ -193,19 +193,13 @@ class BossingTab extends JPanel
 		if (setup.supplies != null && !setup.supplies.isEmpty())
 		{
 			gearList.add(Ui.subheading("Inventory · " + Ui.gp(setup.tripCost) + " a trip"));
-			gearList.add(Ui.wrapped(lines(setup.supplies)));
+			setup.supplies.forEach(line -> gearList.add(lineRow(line)));
 		}
 		if (setup.utility != null && !setup.utility.isEmpty())
 		{
 			gearList.add(Ui.subheading("Also bring"));
-			JLabel utility = Ui.wrapped(lines(setup.utility));
-			StringBuilder why = new StringBuilder("<html>");
-			for (LazyScapingApi.ItemLine line : setup.utility)
-			{
-				why.append("<b>").append(Ui.escape(line.name)).append(":</b> ").append(Ui.escape(line.why)).append("<br>");
-			}
-			utility.setToolTipText(why.append("</html>").toString());
-			gearList.add(utility);
+			gearList.add(Ui.wrapped(Ui.muted("Hover an item to see why.")));
+			setup.utility.forEach(line -> gearList.add(lineRow(line)));
 		}
 		Ui.refresh(gearList);
 	}
@@ -269,12 +263,7 @@ class BossingTab extends JPanel
 	/** One gear slot: the item's picture, then the slot, item and what to get next. */
 	private JComponent slotRow(LazyScapingApi.GearSlot s)
 	{
-		JLabel picture = new JLabel();
-		picture.setPreferredSize(ICON_SIZE);
-		picture.setMinimumSize(ICON_SIZE);
-		picture.setHorizontalAlignment(SwingConstants.CENTER);
-		picture.setVerticalAlignment(SwingConstants.TOP);
-
+		JLabel picture = picture();
 		StringBuilder text = new StringBuilder(Ui.muted(Ui.escape(s.slot))).append("<br>");
 		if ("twoHanded".equals(s.status))
 		{
@@ -295,42 +284,64 @@ class BossingTab extends JPanel
 			{
 				text.append("<br>").append(Ui.muted("Upgrade: " + Ui.escape(s.next.name) + (s.next.price != null ? " · " + Ui.gp(s.next.price) : "")));
 			}
-			icons.load(s.item, false, picture);
+			icons.load(s.item, 1, false, picture);
 		}
 		else if (s.next != null)
 		{
 			text.append(Ui.colored(s.missingRequired ? Ui.MISSING : Ui.GOLD, (s.missingRequired ? "Needed: " : "Get: ") + Ui.escape(s.next.name)))
 				.append("<br>").append(Ui.muted(s.next.price != null ? Ui.gp(s.next.price) : "Untradeable"));
 			// The item to get, faded, since you don't have it yet.
-			icons.load(s.next, true, picture);
+			icons.load(s.next, 1, true, picture);
 		}
 		else
 		{
 			text.append(Ui.muted("Empty"));
 		}
-
-		JPanel row = new JPanel(new BorderLayout(6, 0));
-		row.setOpaque(false);
-		row.add(picture, BorderLayout.WEST);
-		row.add(Ui.wrapped(text.toString(), ICON_TEXT_WIDTH), BorderLayout.CENTER);
-		return Ui.spaced(row, 4);
+		return itemRow(picture, text.toString());
 	}
 
-	private static String lines(List<LazyScapingApi.ItemLine> lines)
+	/** A supply or utility item: its picture (with the quantity on it, like a stack), name and cost. */
+	private JComponent lineRow(LazyScapingApi.ItemLine line)
 	{
-		StringBuilder out = new StringBuilder();
-		for (LazyScapingApi.ItemLine line : lines)
+		JLabel picture = picture();
+		icons.load(line, line.qty, false, picture);
+		String text = (line.qty > 1 ? line.qty + " x " : "") + Ui.escape(line.name)
+			+ (line.cost != null && line.cost > 0 ? "<br>" + Ui.muted(Ui.gp(line.cost)) : "");
+		JComponent row = itemRow(picture, text);
+		if (line.why != null)
 		{
-			if (out.length() > 0)
-			{
-				out.append("<br>");
-			}
-			out.append(line.qty > 1 ? line.qty + " x " : "").append(Ui.escape(line.name));
-			if (line.cost != null && line.cost > 0)
-			{
-				out.append(' ').append(Ui.muted("· " + Ui.gp(line.cost)));
-			}
+			row.setToolTipText(Ui.html(Ui.escape(line.why), Ui.WRAP_WIDTH));
+			picture.setToolTipText(row.getToolTipText());
 		}
-		return out.toString();
+		return row;
+	}
+
+	private static JLabel picture()
+	{
+		JLabel picture = new JLabel();
+		picture.setPreferredSize(ICON_SIZE);
+		picture.setMinimumSize(ICON_SIZE);
+		picture.setHorizontalAlignment(SwingConstants.CENTER);
+		picture.setVerticalAlignment(SwingConstants.TOP);
+		return picture;
+	}
+
+	/** An item's picture with text beside it. */
+	private static JComponent itemRow(JLabel picture, String text)
+	{
+		JLabel label = Ui.wrapped(text, ICON_TEXT_WIDTH);
+		JPanel row = new JPanel(new BorderLayout(6, 0))
+		{
+			@Override
+			public void setToolTipText(String tip)
+			{
+				super.setToolTipText(tip);
+				label.setToolTipText(tip);
+			}
+		};
+		row.setOpaque(false);
+		row.add(picture, BorderLayout.WEST);
+		row.add(label, BorderLayout.CENTER);
+		return Ui.spaced(row, 4);
 	}
 }
