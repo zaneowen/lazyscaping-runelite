@@ -50,7 +50,7 @@ final class TravelView
 
 		if (travel.getWiki() != null)
 		{
-			parent.add(Components.spaced(Components.link("Strategy guide on the OSRS Wiki", () -> actions.openWiki(travel.getWiki())), 6));
+			parent.add(Components.spaced(Components.centered(Components.textButton("Strategy guide on the OSRS Wiki", () -> actions.openWiki(travel.getWiki()))), 8));
 		}
 	}
 }

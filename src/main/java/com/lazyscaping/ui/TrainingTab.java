@@ -229,8 +229,7 @@ class TrainingTab extends JPanel
 		if (more.getComponentCount() > 0)
 		{
 			int hidden = more.getComponentCount();
-			JLabel header = Components.spaced(Components.label(Html.color(Html.GOLD, Html.underline("Show " + hidden + " more method" + (hidden == 1 ? "" : "s")))), 8);
-			methodList.add(Components.expandable(header, more));
+			methodList.add(Components.disclosure(hidden + " more method" + (hidden == 1 ? "" : "s"), more));
 		}
 		Components.refresh(methodList);
 	}

@@ -6,12 +6,17 @@ import java.awt.Component;
 import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
 import java.awt.GridLayout;
+import java.awt.Polygon;
+import java.awt.RenderingHints;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.List;
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
+import javax.swing.Icon;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
@@ -121,7 +126,7 @@ final class Components
 		grid.setOpaque(false);
 		cells.forEach(grid::add);
 
-		JPanel holder = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+		JPanel holder = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
 		holder.setOpaque(false);
 		holder.add(grid);
 		return holder;
@@ -165,12 +170,22 @@ final class Components
 		card.setBackground(ColorScheme.DARKER_GRAY_COLOR);
 		card.setBorder(new EmptyBorder(CARD_PADDING, CARD_PADDING, CARD_PADDING, CARD_PADDING));
 
-		JLabel heading = new JLabel(title);
+		JLabel heading = new JLabel(title, SwingConstants.CENTER);
 		heading.setFont(FontManager.getRunescapeBoldFont());
 		heading.setForeground(Color.WHITE);
 		heading.setBorder(new EmptyBorder(0, 0, 6, 0));
-		card.add(heading);
+		card.add(fullWidth(heading));
 		return card;
+	}
+
+	/** A component centred across the width it's given. */
+	static JComponent centered(JComponent component)
+	{
+		JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
+		row.setOpaque(false);
+		row.add(component);
+		row.setMaximumSize(new Dimension(Integer.MAX_VALUE, row.getPreferredSize().height));
+		return row;
 	}
 
 	static JComponent fullWidth(JComponent component)
@@ -224,6 +239,15 @@ final class Components
 		return spaced(label(Html.white(Html.escape(text))), 10);
 	}
 
+	/** A small-font label centred across its width, for short one-line notes. */
+	static JLabel centeredLabel()
+	{
+		JLabel label = new JLabel("", SwingConstants.CENTER);
+		label.setFont(FontManager.getRunescapeSmallFont());
+		label.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+		return label;
+	}
+
 	static JButton button(String text)
 	{
 		return button(text, TEXT_WIDTH);
@@ -255,6 +279,90 @@ final class Components
 				action.run();
 			}
 		});
+	}
+
+	/**
+	 * A shaded bar with an arrow that shows and hides {@code details}, so it's
+	 * plain that there's more inside.
+	 */
+	static JComponent disclosure(String title, JComponent details)
+	{
+		JLabel name = new JLabel(title);
+		name.setFont(FontManager.getRunescapeSmallFont());
+		name.setForeground(Color.WHITE);
+		ArrowIcon arrow = new ArrowIcon();
+		JLabel toggle = new JLabel("Show", arrow, SwingConstants.RIGHT);
+		toggle.setFont(FontManager.getRunescapeSmallFont());
+		toggle.setForeground(Html.GOLD);
+		toggle.setHorizontalTextPosition(SwingConstants.LEFT);
+		toggle.setIconTextGap(5);
+
+		JPanel bar = new JPanel(new BorderLayout(6, 0));
+		bar.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		bar.setBorder(new EmptyBorder(5, 8, 5, 8));
+		bar.add(name, BorderLayout.CENTER);
+		bar.add(toggle, BorderLayout.EAST);
+
+		JPanel panel = column();
+		details.setVisible(false);
+		onClick(bar, () ->
+		{
+			boolean open = !details.isVisible();
+			details.setVisible(open);
+			arrow.open = open;
+			toggle.setText(open ? "Hide" : "Show");
+			panel.revalidate();
+			panel.repaint();
+		});
+		bar.addMouseListener(new MouseAdapter()
+		{
+			@Override
+			public void mouseEntered(MouseEvent e)
+			{
+				bar.setBackground(ColorScheme.DARK_GRAY_HOVER_COLOR);
+			}
+
+			@Override
+			public void mouseExited(MouseEvent e)
+			{
+				bar.setBackground(ColorScheme.DARK_GRAY_COLOR);
+			}
+		});
+		panel.add(spaced(fullWidth(bar), 8));
+		panel.add(details);
+		return panel;
+	}
+
+	/** A small triangle pointing right when closed and down when open. */
+	private static final class ArrowIcon implements Icon
+	{
+		private static final int SIZE = 7;
+		private boolean open;
+
+		@Override
+		public void paintIcon(Component c, Graphics g, int x, int y)
+		{
+			Graphics2D g2 = (Graphics2D) g.create();
+			g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+			g2.setColor(Html.GOLD);
+			Polygon triangle = open
+				? new Polygon(new int[]{x, x + SIZE, x + SIZE / 2}, new int[]{y + 1, y + 1, y + SIZE - 1}, 3)
+				: new Polygon(new int[]{x + 1, x + SIZE - 1, x + 1}, new int[]{y, y + SIZE / 2, y + SIZE}, 3);
+			g2.fill(triangle);
+			g2.dispose();
+		}
+
+		@Override
+		public int getIconWidth()
+		{
+			return SIZE;
+		}
+
+		@Override
+		public int getIconHeight()
+		{
+			return SIZE;
+		}
 	}
 
 	/** A clickable header that shows and hides {@code details}. */
@@ -333,7 +441,7 @@ final class Components
 	{
 		list.removeAll();
 		list.add(label(Html.color(Html.RED, Html.escape(message))));
-		list.add(spaced(textButton("Try again", retry), 4));
+		list.add(spaced(centered(textButton("Try again", retry)), 6));
 		refresh(list);
 	}
 

@@ -214,8 +214,7 @@ class SlayerTab extends JPanel
 		}
 		if (more.getComponentCount() > 0)
 		{
-			JLabel header = Components.spaced(Components.label(Html.color(Html.GOLD, Html.underline("Tips and more"))), 8);
-			taskInfo.add(Components.expandable(header, more));
+			taskInfo.add(Components.disclosure("Tips and more", more));
 		}
 	}
 

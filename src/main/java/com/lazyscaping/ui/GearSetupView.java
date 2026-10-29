@@ -26,7 +26,7 @@ class GearSetupView
 	private final JComponent styleRow = Components.labeledRow("Style", styleBox);
 	private final BudgetPicker budget;
 	private final JButton bankButton = Components.button("Show setup in bank");
-	private final JLabel bankMessage = Components.label("");
+	private final JLabel bankMessage = Components.centeredLabel();
 	private final JPanel setupPanel = Components.column();
 	private final JPanel panel = Components.column();
 
@@ -55,7 +55,7 @@ class GearSetupView
 		panel.add(styleRow);
 		panel.add(budget);
 		panel.add(setupPanel);
-		panel.add(Components.spaced(Components.textButton("Open the full plan on lazyscaping.app", () -> actions.openGearPlan(target)), 10));
+		panel.add(Components.spaced(Components.centered(Components.textButton("Open the full plan on lazyscaping.app", () -> actions.openGearPlan(target))), 10));
 		showMessage(null);
 	}
 
@@ -92,7 +92,7 @@ class GearSetupView
 
 	void showBankMessage(String message)
 	{
-		bankMessage.setText(message == null ? "" : Html.muted(Html.escape(message)));
+		bankMessage.setText(message == null ? "" : "<html>" + Html.muted(Html.escape(message)) + "</html>");
 		bankMessage.setVisible(message != null);
 	}
 
@@ -122,7 +122,7 @@ class GearSetupView
 			addSummary(setup);
 			setupPanel.add(Components.gap(8));
 			setupPanel.add(Components.fullWidth(bankButton));
-			setupPanel.add(bankMessage);
+			setupPanel.add(Components.fullWidth(bankMessage));
 
 			setupPanel.add(Components.subheading("Worn gear"));
 			setup.getPicks().forEach(slot -> setupPanel.add(slotRow(slot)));
@@ -231,8 +231,7 @@ class GearSetupView
 			return details;
 		}
 
-		JLabel header = Components.spaced(Components.label(Html.color(Html.GOLD, Html.underline("Switch and spec upgrades"))), 8);
-		return Components.expandable(header, details);
+		return Components.disclosure("Switch and spec upgrades", details);
 	}
 
 	/** One equipment slot: the item's picture, then the item and what to get next. */
