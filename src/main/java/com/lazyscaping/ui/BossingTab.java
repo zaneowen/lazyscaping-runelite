@@ -57,7 +57,7 @@ class BossingTab extends JPanel
 		});
 
 		JPanel card = Components.card("Gear setup");
-		card.add(Components.label(Html.muted("Pick a boss to see the best setup from your gear.")));
+		card.add(Components.intro("Pick a boss to see the best setup from your gear."));
 		card.add(Components.gap(4));
 		card.add(Components.labeledRow("Type", groupBox));
 		card.add(Components.gap(4));

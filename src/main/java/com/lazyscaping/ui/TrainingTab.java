@@ -146,10 +146,10 @@ class TrainingTab extends JPanel
 		}
 		else
 		{
-			xpLeft.setText(Format.number(left) + " xp to go");
-			rate.setText(progress.getXpPerHour() > 0
+			xpLeft.setText(Html.wrapCentered(Format.number(left) + " xp to go", Components.TEXT_WIDTH));
+			rate.setText(Html.wrapCentered(progress.getXpPerHour() > 0
 				? Html.parts(Format.number(progress.getXpPerHour()) + " xp/hr", "done in " + Format.hours((double) left / progress.getXpPerHour()))
-				: "Train this skill to see your time left.");
+				: "Train this skill to see your time left.", Components.TEXT_WIDTH));
 		}
 	}
 
@@ -174,7 +174,7 @@ class TrainingTab extends JPanel
 		}
 		else
 		{
-			planList.add(Components.label(Html.parts("About " + Format.hours(plan.getTotalHours()), Format.cost(plan.getTotalCost()))));
+			planList.add(Components.label(Html.wrapCentered(Html.parts("About " + Format.hours(plan.getTotalHours()), Format.cost(plan.getTotalCost())), Components.TEXT_WIDTH)));
 			if (plan.isOverBudget())
 			{
 				planList.add(Components.label(Html.color(Html.RED, "Over your budget, so this uses the cheapest methods.")));
@@ -183,7 +183,7 @@ class TrainingTab extends JPanel
 			{
 				planList.add(Components.label(Html.color(Html.GOLD, "Using the method you picked where it can be.")));
 			}
-			planList.add(Components.label(Html.muted("Click a step for details.")));
+			planList.add(Components.intro("Click a step for details."));
 			plan.getSteps().forEach(step -> planList.add(stepRow(step, plan.option(step.getId()))));
 		}
 		showMethods(plan);
@@ -212,7 +212,7 @@ class TrainingTab extends JPanel
 			return;
 		}
 
-		methodList.add(Components.label(Html.muted("Click a method for details. Pick one to plan around it.")));
+		methodList.add(Components.intro("Click a method for details. Pick one to plan around it."));
 		if (plan.getMethod() != null)
 		{
 			methodList.add(Components.gap(4));

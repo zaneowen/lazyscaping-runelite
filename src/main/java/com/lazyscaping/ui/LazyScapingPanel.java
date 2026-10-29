@@ -7,6 +7,7 @@ import com.lazyscaping.api.SlayerTaskRef;
 import java.awt.BorderLayout;
 import java.awt.GridLayout;
 import java.util.List;
+import java.util.Set;
 import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -26,7 +27,7 @@ public class LazyScapingPanel extends PluginPanel
 	private final BossingTab bossing;
 	private final SlayerTab slayer;
 	private final JLabel status = Components.label("");
-	private final JPanel liveNotice = Components.card("Live recommendations are off");
+	private final JPanel liveNotice = Components.card("Live recommendations");
 
 	public LazyScapingPanel(PanelActions actions, IconLoader icons)
 	{
@@ -36,15 +37,22 @@ public class LazyScapingPanel extends PluginPanel
 		bossing = new BossingTab(actions, icons);
 		slayer = new SlayerTab(actions, icons);
 
-		JLabel title = new JLabel("LazyScaping");
+		// the title is centred, with Refresh on the right and a matching space on the left
+		JLabel title = new JLabel("LazyScaping", SwingConstants.CENTER);
 		title.setFont(FontManager.getRunescapeBoldFont());
 		title.setForeground(Html.GOLD);
+		JLabel refresh = Components.textButton("Refresh", actions::refresh);
+		JPanel spacer = new JPanel();
+		spacer.setOpaque(false);
+		spacer.setPreferredSize(refresh.getPreferredSize());
 		JPanel titleRow = new JPanel(new BorderLayout());
 		titleRow.setOpaque(false);
-		titleRow.add(title, BorderLayout.WEST);
-		titleRow.add(Components.textButton("Refresh", actions::refresh), BorderLayout.EAST);
+		titleRow.add(spacer, BorderLayout.WEST);
+		titleRow.add(title, BorderLayout.CENTER);
+		titleRow.add(refresh, BorderLayout.EAST);
 
-		liveNotice.add(Components.label("Turn on <b>Live recommendations</b> in this plugin's settings to see your training plan and gear setups."));
+		liveNotice.add(Components.label(Html.wrapCentered("Turn on <b>Live recommendations</b> in this plugin's settings to see your training plan and gear setups.",
+			Components.TEXT_WIDTH)));
 
 		JButton sync = Components.button("Open my planner on lazyscaping.app");
 		sync.setToolTipText("Opens the site with your name, gear and quests filled in");
@@ -65,11 +73,11 @@ public class LazyScapingPanel extends PluginPanel
 		content.add(status);
 		content.add(Components.gap(6));
 		content.add(liveNotice);
-		content.add(Components.gap(6));
-		content.add(Components.fullWidth(sync));
-		content.add(Components.gap(10));
+		content.add(Components.gap(8));
 		content.add(tabs);
 		content.add(display);
+		content.add(Components.gap(12));
+		content.add(Components.fullWidth(sync));
 		add(content, BorderLayout.NORTH);
 
 		setLoggedIn(false);
@@ -85,7 +93,7 @@ public class LazyScapingPanel extends PluginPanel
 
 	public void setLoggedIn(boolean loggedIn)
 	{
-		status.setText(loggedIn ? "" : "Log in to see your goal and gear setups.");
+		status.setText(loggedIn ? "" : Html.wrapCentered(Html.muted("Log in to see your goal and gear setups."), Components.TEXT_WIDTH));
 		status.setVisible(!loggedIn);
 		if (!loggedIn)
 		{
@@ -183,15 +191,16 @@ public class LazyScapingPanel extends PluginPanel
 		training.showPlanError(message);
 	}
 
-	public void showGearSetup(GearTarget target, GearSetup setup)
+	/** Shows a setup, with the upgrades being tried (by gear id) marked. */
+	public void showGearSetup(GearTarget target, GearSetup setup, Set<String> trying)
 	{
 		if (target == GearTarget.SLAYER)
 		{
-			slayer.showSetup(setup);
+			slayer.showSetup(setup, trying);
 		}
 		else
 		{
-			bossing.getSetupView().showSetup(setup);
+			bossing.getSetupView().showSetup(setup, trying);
 		}
 	}
 

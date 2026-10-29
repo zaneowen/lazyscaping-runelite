@@ -60,6 +60,12 @@ final class Html
 		return "<u>" + html + "</u>";
 	}
 
+	/** Wraps text to a width in CSS pixels, centring each line. */
+	static String wrapCentered(String html, int width)
+	{
+		return "<html><body style='width:" + width + "px;text-align:center'>" + html + "</body></html>";
+	}
+
 	/** Wraps text to a width in CSS pixels. */
 	static String wrap(String html, int width)
 	{

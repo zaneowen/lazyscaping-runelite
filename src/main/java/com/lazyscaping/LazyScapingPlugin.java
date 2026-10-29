@@ -515,6 +515,28 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 	}
 
 	@Override
+	public void tryUpgrade(GearTarget target, String gearId)
+	{
+		clientThread.invoke(() ->
+		{
+			GearPlan plan = gearPlans.get(target);
+			plan.trying.add(gearId);
+			fetchGearSetup(plan);
+		});
+	}
+
+	@Override
+	public void stopTrying(GearTarget target)
+	{
+		clientThread.invoke(() ->
+		{
+			GearPlan plan = gearPlans.get(target);
+			plan.trying.clear();
+			fetchGearSetup(plan);
+		});
+	}
+
+	@Override
 	public void teamSelected(GearTarget target, String team)
 	{
 		clientThread.invoke(() ->
@@ -840,6 +862,8 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 		plan.lastFetchTick = tickCount;
 		plan.fetchedWith = ownedItems.gear(catalog);
 		Set<String> owned = new TreeSet<>(plan.fetchedWith);
+		// upgrades being tried are planned as if owned
+		owned.addAll(plan.trying);
 		if (target == GearTarget.SLAYER)
 		{
 			if (planWithSlayerHelmet())
@@ -883,7 +907,8 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 					return;
 				}
 				plan.setup = setup;
-				updatePanel(p -> p.showGearSetup(target, setup));
+				Set<String> trying = Set.copyOf(plan.trying);
+				updatePanel(p -> p.showGearSetup(target, setup, trying));
 			}),
 			error -> updatePanel(p -> p.showGearError(target, error)));
 	}

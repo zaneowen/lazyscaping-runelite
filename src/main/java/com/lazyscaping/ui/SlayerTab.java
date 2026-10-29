@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
@@ -120,15 +121,15 @@ class SlayerTab extends JPanel
 	/** Shows the task the game has assigned, or prompts to pick one when there's none. */
 	void setCurrentTask(String description)
 	{
-		status.setText(description == null
+		status.setText(Html.wrapCentered(description == null
 			? Html.muted("No task assigned. Pick one to plan for it.")
-			: Html.white("Current task:") + " " + Html.escape(description));
+			: Html.white("Current task:") + " " + Html.escape(description), Components.TEXT_WIDTH));
 	}
 
-	void showSetup(GearSetup setup)
+	void showSetup(GearSetup setup, Set<String> trying)
 	{
 		showTaskInfo(setup.getTask());
-		setupView.showSetup(setup);
+		setupView.showSetup(setup, trying);
 	}
 
 	void showMessage(String message)

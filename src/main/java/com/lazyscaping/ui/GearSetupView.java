@@ -7,11 +7,14 @@ import com.lazyscaping.api.GearSwitch;
 import com.lazyscaping.api.TeamOptions;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.border.EmptyBorder;
+import net.runelite.client.ui.ColorScheme;
 
 /**
  * A gear setup with its team, style and budget pickers: the worn gear, what a budget
@@ -20,6 +23,7 @@ import javax.swing.JPanel;
  */
 class GearSetupView
 {
+	private final GearTarget target;
 	private final PanelActions actions;
 	private final IconLoader icons;
 
@@ -36,9 +40,12 @@ class GearSetupView
 	private final JPanel panel = Components.column();
 
 	private boolean updating;
+	/** Gear ids of the upgrades being tried in the setup shown. */
+	private Set<String> trying = Set.of();
 
 	GearSetupView(GearTarget target, PanelActions actions, IconLoader icons)
 	{
+		this.target = target;
 		this.actions = actions;
 		this.icons = icons;
 		budget = new BudgetPicker(Budget.GEAR_PRESETS, "Gp to spend on gear upgrades and supplies", b -> actions.budgetChanged(true, b));
@@ -133,13 +140,15 @@ class GearSetupView
 			if (option.getId().equals(team.getSelected()))
 			{
 				teamBox.setSelectedItem(option);
-				teamSummary.setText(Html.muted(Html.escape(option.getSummary())));
+				teamSummary.setText(Html.wrapCentered(Html.muted(Html.escape(option.getSummary())), Components.TEXT_WIDTH));
 			}
 		}
 	}
 
-	void showSetup(GearSetup setup)
+	/** Shows a setup. {@code trying} holds the gear ids of upgrades being tried, which are marked. */
+	void showSetup(GearSetup setup, Set<String> trying)
 	{
+		this.trying = trying;
 		updating = true;
 		showTeam(setup.getTeam());
 		styleBox.removeAllItems();
@@ -150,6 +159,10 @@ class GearSetupView
 		budget.setVisible(!setup.isIronman());
 
 		setupPanel.removeAll();
+		if (!trying.isEmpty())
+		{
+			setupPanel.add(tryingBar(setup));
+		}
 		setupPanel.add(Components.gap(4));
 		if (!styleRow.isVisible())
 		{
@@ -277,6 +290,51 @@ class GearSetupView
 		return Components.disclosure("Switch and spec upgrades", details);
 	}
 
+	/** Says which upgrades are being tried and what they'd cost, with a button back to the player's own gear. */
+	private JComponent tryingBar(GearSetup setup)
+	{
+		long cost = 0;
+		int count = 0;
+		for (GearSlot slot : allSlots(setup))
+		{
+			if (isTried(slot))
+			{
+				count++;
+				cost += slot.getItem().getPrice() == null ? 0 : slot.getItem().getPrice();
+			}
+		}
+
+		JPanel bar = Components.column();
+		bar.setOpaque(true);
+		bar.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		bar.setBorder(new EmptyBorder(6, 6, 6, 6));
+		String what = count == 1 ? "Trying 1 upgrade" : "Trying " + count + " upgrades";
+		bar.add(Components.label(Html.wrapCentered(Html.color(Html.GOLD, what) + (cost > 0 ? " " + Html.keep("worth " + Format.gp(cost)) : ""), Components.TEXT_WIDTH - 8)));
+		bar.add(Components.gap(4));
+		JButton back = Components.button("Back to my gear", Components.TEXT_WIDTH - 8);
+		back.setToolTipText("Plan with only the gear you own again");
+		back.addActionListener(e -> actions.stopTrying(target));
+		bar.add(Components.fullWidth(back));
+		return Components.spaced(Components.fullWidth(bar), 6);
+	}
+
+	private boolean isTried(GearSlot slot)
+	{
+		return slot.getItem() != null && slot.getItem().getId() != null && trying.contains(slot.getItem().getId());
+	}
+
+	/** A link to try a slot's next upgrade, or null when there's none to try. */
+	private JComponent tryLink(GearSlot slot)
+	{
+		if (slot.getNext() == null || slot.getNext().getId() == null || slot.getStatus() == GearSlot.Status.TWO_HANDED)
+		{
+			return null;
+		}
+		JLabel link = Components.textButton("Try upgrade", () -> actions.tryUpgrade(target, slot.getNext().getId()));
+		link.setToolTipText("See the setup as if you had " + slot.getNext().getName());
+		return link;
+	}
+
 	/** One equipment slot: the item's picture, then the item and what to get next. */
 	private JComponent slotRow(GearSlot slot)
 	{
@@ -289,7 +347,13 @@ class GearSetupView
 		}
 		else if (slot.getItem() != null)
 		{
-			if (slot.getStatus() == GearSlot.Status.BUY)
+			if (isTried(slot))
+			{
+				Long price = slot.getItem().getPrice();
+				html.append(Html.color(Html.GOLD, "Trying: " + Html.escape(slot.getItem().getName())))
+					.append("<br>").append(Html.muted(price != null ? Format.gp(price) : "Untradeable"));
+			}
+			else if (slot.getStatus() == GearSlot.Status.BUY)
 			{
 				html.append(Html.color(Html.GOLD, "Buy: " + Html.escape(slot.getItem().getName())))
 					.append("<br>").append(Html.color(Html.GOLD, Format.gp(slot.getCost())));
@@ -319,6 +383,6 @@ class GearSetupView
 		{
 			html.append(Html.muted("Empty"));
 		}
-		return Components.spaced(Components.pictureRow(picture, html.toString()), 8);
+		return Components.spaced(Components.pictureRow(picture, html.toString(), tryLink(slot)), 8);
 	}
 }

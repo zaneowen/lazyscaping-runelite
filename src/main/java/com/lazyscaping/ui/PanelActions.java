@@ -20,6 +20,12 @@ public interface PanelActions
 	/** The player said whether to plan Slayer gear with a Slayer helmet (i). */
 	void slayerHelmetChanged(boolean planWithHelmet);
 
+	/** An upgrade was picked to try in a setup, planned as if owned. */
+	void tryUpgrade(GearTarget target, String gearId);
+
+	/** Stops trying upgrades, going back to the gear the player owns. */
+	void stopTrying(GearTarget target);
+
 	/** A team size, "solo" or "group", was picked for a setup. */
 	void teamSelected(GearTarget target, String team);
 

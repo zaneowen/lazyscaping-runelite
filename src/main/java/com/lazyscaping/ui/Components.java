@@ -8,7 +8,10 @@ import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
 import java.awt.GridLayout;
+import java.awt.Insets;
 import java.awt.Polygon;
 import java.awt.RenderingHints;
 import java.awt.event.MouseAdapter;
@@ -234,9 +237,42 @@ final class Components
 		return label;
 	}
 
-	static JLabel subheading(String text)
+	/** A section heading, centred between two thin rules. */
+	static JComponent subheading(String text)
 	{
-		return spaced(label(Html.white(Html.escape(text))), 10);
+		JLabel name = new JLabel(text);
+		name.setFont(FontManager.getRunescapeSmallFont());
+		name.setForeground(Color.WHITE);
+
+		JPanel row = new JPanel(new GridBagLayout());
+		row.setOpaque(false);
+		GridBagConstraints c = new GridBagConstraints();
+		c.fill = GridBagConstraints.HORIZONTAL;
+		c.weightx = 1;
+		row.add(rule(), c);
+		c.weightx = 0;
+		c.insets = new Insets(0, 6, 0, 6);
+		row.add(name, c);
+		c.weightx = 1;
+		c.insets = new Insets(0, 0, 0, 0);
+		row.add(rule(), c);
+		row.setBorder(new EmptyBorder(12, 0, 4, 0));
+		row.setMaximumSize(new Dimension(Integer.MAX_VALUE, row.getPreferredSize().height));
+		return row;
+	}
+
+	private static JComponent rule()
+	{
+		JPanel rule = new JPanel();
+		rule.setBackground(ColorScheme.MEDIUM_GRAY_COLOR);
+		rule.setPreferredSize(new Dimension(1, 1));
+		return rule;
+	}
+
+	/** Muted text centred across the card, for a card's opening line. */
+	static JLabel intro(String text)
+	{
+		return label(Html.wrapCentered(Html.muted(Html.escape(text)), TEXT_WIDTH));
 	}
 
 	/** A small-font label centred across its width, for short one-line notes. */
@@ -418,10 +454,23 @@ final class Components
 	/** A picture with wrapped text beside it. */
 	static JPanel pictureRow(JLabel picture, String html)
 	{
+		return pictureRow(picture, html, null);
+	}
+
+	/** A picture with wrapped text beside it, and {@code below} under the text, like a link. */
+	static JPanel pictureRow(JLabel picture, String html, JComponent below)
+	{
+		JPanel text = column();
+		text.add(label(html, TEXT_BESIDE_ICON_WIDTH));
+		if (below != null)
+		{
+			text.add(spaced(below, 2));
+		}
+
 		JPanel row = new JPanel(new BorderLayout(6, 0));
 		row.setOpaque(false);
 		row.add(picture, BorderLayout.WEST);
-		row.add(label(html, TEXT_BESIDE_ICON_WIDTH), BorderLayout.CENTER);
+		row.add(text, BorderLayout.CENTER);
 		return spaced(row, 4);
 	}
 
@@ -431,7 +480,7 @@ final class Components
 		list.removeAll();
 		if (message != null)
 		{
-			list.add(label(Html.escape(message)));
+			list.add(spaced(label(Html.wrapCentered(Html.muted(Html.escape(message)), TEXT_WIDTH)), 6));
 		}
 		refresh(list);
 	}
@@ -440,7 +489,7 @@ final class Components
 	static void showError(JPanel list, String message, Runnable retry)
 	{
 		list.removeAll();
-		list.add(label(Html.color(Html.RED, Html.escape(message))));
+		list.add(spaced(label(Html.wrapCentered(Html.color(Html.RED, Html.escape(message)), TEXT_WIDTH)), 6));
 		list.add(spaced(centered(textButton("Try again", retry)), 6));
 		refresh(list);
 	}
