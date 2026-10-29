@@ -19,6 +19,14 @@ public class GearSetup
 	/** Set when no gear can be brought, saying why. */
 	private String noGear;
 	private List<GearSlot> picks = Collections.emptyList();
+	/**
+	 * Total bonuses of the worn gear, as on the in-game equipment stats screen:
+	 * five attack bonuses, five defence bonuses, then melee strength, ranged
+	 * strength, magic damage % and prayer.
+	 */
+	private List<Integer> stats = Collections.emptyList();
+	/** Indexes into {@link #stats} of the bonuses that matter most for the style. */
+	private List<Integer> keyStats = Collections.emptyList();
 	private List<GearSwitch> switches = Collections.emptyList();
 	private GearSlot spec;
 	/** One entry per inventory slot, in packing order. */

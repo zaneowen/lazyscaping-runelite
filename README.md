@@ -2,7 +2,7 @@
 
 A RuneLite plugin for [LazyScaping](https://lazyscaping.app), the easy, cheap OSRS training and boss gear planner.
 
-<img src="docs/training.png" alt="The Training tab: a Herblore goal with progress, the plan by level and training methods" width="242"> <img src="docs/bossing.png" alt="The Bossing tab: a solo Nex gear setup trying one upgrade, with each worn slot, its price and the next upgrade" width="242"> <img src="docs/slayer.png" alt="The Slayer tab: the current task, its requirements, where to kill them and gear for the task" width="242">
+<img src="docs/training.png" alt="The Training tab: a Herblore goal with progress, the plan by level and training methods" width="242"> <img src="docs/bossing.png" alt="The Bossing tab: a solo Nex gear setup with an overview, each worn slot with its price and the next upgrade" width="242"> <img src="docs/slayer.png" alt="The Slayer tab: the current task, its requirements, where to kill them and gear for the task" width="242">
 
 Found a bug or have an idea? [Open an issue](https://github.com/zaneowen/lazyscaping-runelite/issues).
 
@@ -20,6 +20,7 @@ The side panel has three tabs.
 **Bossing**
 - **Gear setup.** Pick a boss, by name or narrowed to a type like *Slayer bosses* or *Raids*, to see the best setup from the gear you own: each worn slot's item with its picture, what to get next and its GE price, the packed inventory with switches, the special attack weapon and supplies, and how to get there. With a budget, it also buys the best upgrades you can afford (not for ironmen).
 - **Solo or group.** Bosses with solo and group builds, like the raids, Nex and the God Wars generals, have a *Team* picker. The choice is saved per boss.
+- **Equipment stats.** The worn gear's total bonuses, laid out like the in-game equipment stats screen, with the ones that matter for your style in gold.
 - **Try upgrades.** Click *Try upgrade* under any slot to see the setup as if you had the next item, switches and inventory included. Try as many as you like, then *Back to my gear* returns to what you own.
 
 **Slayer**

@@ -67,18 +67,19 @@ final class InventoryView
 		List<InventorySlot> slots = setup.getInventory();
 		int size = setup.getInventorySize() > 0 ? setup.getInventorySize() : DEFAULT_SIZE;
 		parent.add(Components.subheading("Inventory"));
-		parent.add(Components.label(Html.muted(Html.parts(slots.size() + "/" + size + " slots", "supplies " + Format.gp(setup.getTripCost()) + " a trip"))));
-		parent.add(Components.label(slotCounts(slots)));
+		parent.add(Components.label(Html.wrapCentered(Html.muted(Html.parts(slots.size() + "/" + size + " slots", "supplies " + Format.gp(setup.getTripCost()) + " a trip")),
+			Components.TEXT_WIDTH)));
+		parent.add(Components.label(Html.wrapCentered(slotCounts(slots), Components.TEXT_WIDTH)));
 		parent.add(Components.spaced(grid(slots, size, setup.getRunePouch(), icons), 6));
 
 		if (setup.getFoodCut() > 0)
 		{
-			parent.add(Components.spaced(Components.label(Html.muted(setup.getFoodCut() + " food left out so your switches fit.")), 4));
+			parent.add(Components.spaced(Components.label(Html.wrapCentered(Html.muted(setup.getFoodCut() + " food left out so your switches fit."), Components.TEXT_WIDTH)), 4));
 		}
 		if (setup.getOverflow() > 0)
 		{
 			String items = setup.getOverflow() == 1 ? " more item won't" : " more items won't";
-			parent.add(Components.spaced(Components.label(Html.color(Html.RED, setup.getOverflow() + items + " fit in one inventory.")), 4));
+			parent.add(Components.spaced(Components.label(Html.wrapCentered(Html.color(Html.RED, setup.getOverflow() + items + " fit in one inventory."), Components.TEXT_WIDTH)), 4));
 		}
 		parent.add(contents(slots, setup.getRunePouch()));
 	}
@@ -169,7 +170,9 @@ final class InventoryView
 		{
 			StringBuilder html = new StringBuilder(Html.color(groupKinds.get(group).color, Html.escape(group)));
 			items.forEach((name, count) -> html.append("<br>").append(count > 1 ? count + " x " : "").append(Html.escape(name)));
-			list.add(Components.spaced(Components.label(html.toString()), 6));
+			JPanel entry = Components.entry();
+			entry.add(Components.label(html.toString(), Components.ENTRY_WIDTH));
+			list.add(entry);
 		});
 		return list;
 	}

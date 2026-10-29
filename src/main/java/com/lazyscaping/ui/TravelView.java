@@ -38,9 +38,13 @@ final class TravelView
 
 		if (!travel.getRoutes().isEmpty())
 		{
-			StringBuilder html = new StringBuilder(Html.white("Other ways:"));
-			travel.getRoutes().forEach(route -> html.append("<br>- ").append(Html.escape(route)));
-			parent.add(Components.spaced(Components.label(html.toString()), 6));
+			parent.add(Components.spaced(Components.label(Html.white("Other ways")), 8));
+			for (String route : travel.getRoutes())
+			{
+				JPanel entry = Components.entry();
+				entry.add(Components.label(Html.escape(route), Components.ENTRY_WIDTH));
+				parent.add(entry);
+			}
 
 			String tip = (travel.isFairyRings() ? "Fairy rings need a dramen staff until you finish the elite Lumbridge & Draynor Diary. " : "")
 				+ "In your house, a portal nexus or jewellery box" + (travel.isFairyRings() ? " (or fairy ring)" : "")

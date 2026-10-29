@@ -163,7 +163,7 @@ class GearSetupView
 		{
 			setupPanel.add(tryingBar(setup));
 		}
-		setupPanel.add(Components.gap(4));
+		setupPanel.add(Components.subheading("Overview"));
 		if (!styleRow.isVisible())
 		{
 			setupPanel.add(Components.fact("Style", Html.escape(setup.getStyle())));
@@ -183,6 +183,7 @@ class GearSetupView
 			setupPanel.add(Components.subheading("Worn gear"));
 			setup.getPicks().forEach(slot -> setupPanel.add(slotRow(slot)));
 			setupPanel.add(switchDetails(setup));
+			StatsView.addTo(setupPanel, setup);
 		}
 
 		if (!setup.getInventory().isEmpty())
@@ -383,6 +384,6 @@ class GearSetupView
 		{
 			html.append(Html.muted("Empty"));
 		}
-		return Components.spaced(Components.pictureRow(picture, html.toString(), tryLink(slot)), 8);
+		return Components.listRow(Components.pictureRow(picture, html.toString(), tryLink(slot)));
 	}
 }

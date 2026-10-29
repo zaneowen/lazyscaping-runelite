@@ -269,6 +269,15 @@ final class Components
 		return rule;
 	}
 
+	/** One row of a list, with a thin line under it to set it apart from the next. */
+	static JComponent listRow(JComponent content)
+	{
+		content.setBorder(BorderFactory.createCompoundBorder(
+			BorderFactory.createMatteBorder(0, 0, 1, 0, ColorScheme.DARK_GRAY_COLOR),
+			new EmptyBorder(5, 0, 5, 0)));
+		return content;
+	}
+
 	/** Muted text centred across the card, for a card's opening line. */
 	static JLabel intro(String text)
 	{
