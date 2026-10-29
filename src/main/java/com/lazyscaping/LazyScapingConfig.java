@@ -76,10 +76,24 @@ public interface LazyScapingConfig extends Config
 
 	@ConfigSection(
 		name = "Your house",
-		description = "What your house has. Gear setups bring a house teleport instead of the teleports these replace.",
+		description = "What your house has. Gear setups bring a house teleport instead of the teleports these replace.<br>"
+			+ "Ticked for you when you visit your house, and open your portal nexus once for its portals.",
 		position = 10
 	)
 	String houseSection = "house";
+
+	@ConfigItem(
+		keyName = "readHouse",
+		name = "Read my house",
+		description = "Tick these for you from what's in your house when you teleport there or use its portal's Home option,<br>"
+			+ "and from your portal nexus's teleport menu. Turn off to tick them yourself.",
+		section = houseSection,
+		position = 10
+	)
+	default boolean readHouse()
+	{
+		return true;
+	}
 
 	@ConfigItem(
 		keyName = "houseFairyRing",

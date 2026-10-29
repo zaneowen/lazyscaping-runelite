@@ -18,33 +18,40 @@ import com.lazyscaping.ui.PanelActions;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.EnumMap;
+import java.util.function.Consumer;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.function.Consumer;
 import javax.inject.Inject;
 import javax.swing.SwingUtilities;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
-import net.runelite.api.Experience;
-import net.runelite.api.GameState;
-import net.runelite.api.Skill;
+import net.runelite.api.events.DecorativeObjectDespawned;
+import net.runelite.api.events.DecorativeObjectSpawned;
+import net.runelite.api.events.GameObjectDespawned;
+import net.runelite.api.events.GameObjectSpawned;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.ItemContainerChanged;
+import net.runelite.api.events.MenuOptionClicked;
 import net.runelite.api.events.StatChanged;
+import net.runelite.api.events.WallObjectDespawned;
+import net.runelite.api.events.WallObjectSpawned;
 import net.runelite.api.events.WidgetLoaded;
+import net.runelite.api.Experience;
+import net.runelite.api.GameState;
 import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.gameval.InventoryID;
+import net.runelite.api.Skill;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
+import net.runelite.client.plugins.banktags.BankTagsPlugin;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDependency;
 import net.runelite.client.plugins.PluginDescriptor;
-import net.runelite.client.plugins.banktags.BankTagsPlugin;
 import net.runelite.client.plugins.slayer.SlayerPlugin;
 import net.runelite.client.plugins.slayer.SlayerPluginService;
 import net.runelite.client.plugins.xptracker.XpTrackerPlugin;
@@ -114,6 +121,9 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 	private BankTagLoader bankTagLoader;
 
 	@Inject
+	private HouseReader houseReader;
+
+	@Inject
 	private Gson gson;
 
 	private volatile LazyScapingPanel panel;
@@ -123,6 +133,8 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 	// Client thread state
 	private String playerName;
 	private boolean loadPending;
+	/** A house setting changed, so the gear setups need fetching again. */
+	private volatile boolean houseChanged;
 	private int tickCount;
 	private final Map<Skill, Integer> levels = new EnumMap<>(Skill.class);
 
@@ -200,6 +212,8 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 		{
 			// the player's name and stats arrive over the next tick or two
 			loadPending = true;
+			// also after every area loads, which may be the player's house
+			houseReader.onSceneLoaded();
 		}
 		else if (event.getGameState() == GameState.LOGIN_SCREEN)
 		{
@@ -213,6 +227,10 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 	public void onGameTick(GameTick tick)
 	{
 		tickCount++;
+		if (config.readHouse())
+		{
+			houseReader.onTick(tickCount);
+		}
 		if (loadPending)
 		{
 			String name = account.name();
@@ -236,6 +254,12 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 		{
 			updateProgress();
 			updateSlayerTask();
+		}
+		if (houseChanged)
+		{
+			// once for however many house settings changed together
+			houseChanged = false;
+			fetchGearSetups();
 		}
 		for (GearPlan plan : gearPlans.values())
 		{
@@ -317,6 +341,56 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 			// the bank's items load after its interface
 			clientThread.invokeLater(bankTagLoader::onBankOpened);
 		}
+		else if (event.getGroupId() == InterfaceID.TELENEXUS_TELEPORT)
+		{
+			houseReader.onNexusMenuOpened();
+		}
+		else if (event.getGroupId() == InterfaceID.POH_BOARD)
+		{
+			houseReader.onAdvertisementBoardOpened();
+		}
+	}
+
+	@Subscribe
+	public void onMenuOptionClicked(MenuOptionClicked event)
+	{
+		houseReader.onMenuOptionClicked(event, tickCount);
+	}
+
+	@Subscribe
+	public void onGameObjectSpawned(GameObjectSpawned event)
+	{
+		houseReader.onObjectChanged();
+	}
+
+	@Subscribe
+	public void onGameObjectDespawned(GameObjectDespawned event)
+	{
+		houseReader.onObjectChanged();
+	}
+
+	@Subscribe
+	public void onWallObjectSpawned(WallObjectSpawned event)
+	{
+		houseReader.onObjectChanged();
+	}
+
+	@Subscribe
+	public void onWallObjectDespawned(WallObjectDespawned event)
+	{
+		houseReader.onObjectChanged();
+	}
+
+	@Subscribe
+	public void onDecorativeObjectSpawned(DecorativeObjectSpawned event)
+	{
+		houseReader.onObjectChanged();
+	}
+
+	@Subscribe
+	public void onDecorativeObjectDespawned(DecorativeObjectDespawned event)
+	{
+		houseReader.onObjectChanged();
 	}
 
 	@Subscribe
@@ -350,10 +424,10 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 				clientThread.invoke(this::fetchGearSetups);
 				break;
 			default:
-				// the house tick boxes
+				// the house tick boxes, which reading the house can change many of at once
 				if (event.getKey().startsWith("house"))
 				{
-					clientThread.invoke(this::fetchGearSetups);
+					houseChanged = true;
 				}
 				break;
 		}
@@ -768,7 +842,7 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 		body.add("budget", budgetJson(gearBudget));
 		body.addProperty("lumbridgeElite", config.lumbridgeElite() || account.hasLumbridgeElite());
 		JsonArray house = new JsonArray();
-		HouseTeleport.owned(config).forEach(teleport -> house.add(teleport.getApiName()));
+		HouseTeleport.owned(configManager).forEach(teleport -> house.add(teleport.getApiName()));
 		body.add("house", house);
 
 		String requested = plan.selectedId;
