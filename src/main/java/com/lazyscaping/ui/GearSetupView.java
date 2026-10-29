@@ -341,14 +341,7 @@ class GearSetupView
 		{
 			return Html.color(Html.GREEN, Html.keep("+" + upgrade.getGearGain() + "% closer to the best"));
 		}
-		String gain = Html.color(Html.GREEN, Html.keep("+" + Format.gp(upgrade.getGpPerHour()) + "/hr"));
-		Double payback = upgrade.getPaybackHours();
-		if (payback == null)
-		{
-			return gain;
-		}
-		String when = payback < 1 ? "pays for itself within the hour" : "pays for itself in " + Format.hours(payback);
-		return gain + ", " + Html.muted(when);
+		return Html.color(Html.GREEN, Html.keep("+" + Format.gp(upgrade.getGpPerHour()) + "/hr"));
 	}
 
 	/** Where the gear comes from. */

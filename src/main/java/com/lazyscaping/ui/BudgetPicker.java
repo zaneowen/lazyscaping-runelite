@@ -69,11 +69,11 @@ class BudgetPicker extends JPanel
 		String text = text();
 		if (!Budget.isValid(text))
 		{
-			note.setText(Html.color(Html.RED, "Type an amount like 25m, or Unlimited."));
+			note.setText(Html.wrapCentered(Html.color(Html.RED, "Type an amount like 25m, or Unlimited."), Components.TEXT_WIDTH));
 		}
 		else if (Budget.isMyCoins(text))
 		{
-			note.setText(Format.gp(coins) + " in your bank and inventory" + (coins == 0 ? " (open your bank once)" : ""));
+			note.setText(Html.wrapCentered(Html.muted(Html.escape(Format.gp(coins) + " in your bank and inventory" + (coins == 0 ? " (open your bank once)" : ""))), Components.TEXT_WIDTH));
 		}
 		else
 		{

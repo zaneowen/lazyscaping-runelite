@@ -86,7 +86,7 @@ final class StatsView
 	}
 
 	/** A bonus with its sign, and a decimal only when it has one, like "+8.2" or "-35". */
-	private static String signed(double value)
+	static String signed(double value)
 	{
 		String number = value == Math.rint(value) ? String.valueOf((long) value) : String.format(Locale.ROOT, "%.1f", value);
 		return value > 0 ? "+" + number : number;

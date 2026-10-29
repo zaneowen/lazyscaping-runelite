@@ -12,6 +12,4 @@ public class UpgradeOption extends GearItem
 	private int gearGain;
 	/** Extra gp an hour, or null when the boss has no money making guide. */
 	private Long gpPerHour;
-	/** Hours of bossing for the extra gp to cover its price, or null. */
-	private Double paybackHours;
 }

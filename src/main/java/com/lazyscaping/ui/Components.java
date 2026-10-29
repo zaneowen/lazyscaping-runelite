@@ -19,8 +19,11 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.ToIntFunction;
+import java.util.stream.Collectors;
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.Icon;
@@ -59,6 +62,8 @@ final class Components
 	private static final int GRID_GAP = 3;
 	/** Width of the labels in front of pickers and facts, so they line up. */
 	private static final int PICKER_LABEL_WIDTH = 44;
+	/** Between phrases in a row, like "26/28 slots · supplies 185.6k gp a trip". */
+	static final String PHRASE_SEPARATOR = " · ";
 	/** Width that a fact's value wraps at, beside its label. */
 	private static final int FACT_WIDTH = TEXT_WIDTH - (PICKER_LABEL_WIDTH + 4) * 3 / 4;
 	/** The line and gap down the left of an {@link #entry}. */
@@ -249,33 +254,45 @@ final class Components
 	{
 		FontMetrics metrics = new JLabel().getFontMetrics(FontManager.getRunescapeSmallFont());
 		// TEXT_WIDTH is in CSS pixels, which Swing draws about 4/3 larger
-		int maxWidth = TEXT_WIDTH * 4 / 3;
-		String separator = " · ";
-		int separatorWidth = metrics.stringWidth(separator);
+		List<List<String>> fitted = fitRows(new ArrayList<>(phrases.keySet()), metrics::stringWidth, TEXT_WIDTH * 4 / 3);
 
 		JPanel rows = column();
-		StringBuilder row = new StringBuilder();
-		int rowWidth = 0;
-		for (Map.Entry<String, Color> phrase : phrases.entrySet())
+		for (List<String> row : fitted)
 		{
-			int width = metrics.stringWidth(phrase.getKey());
-			if (row.length() > 0 && rowWidth + separatorWidth + width > maxWidth)
+			String html = row.stream()
+				.map(phrase -> Html.color(phrases.get(phrase), Html.escape(phrase)))
+				.collect(Collectors.joining(Html.muted(PHRASE_SEPARATOR)));
+			rows.add(centeredRow(html));
+		}
+		return rows;
+	}
+
+	/**
+	 * Splits phrases into rows that fit {@code maxWidth}, as many to a row as fit
+	 * once separated by {@link #PHRASE_SEPARATOR}. A phrase too wide alone gets a
+	 * row to itself.
+	 */
+	static List<List<String>> fitRows(List<String> phrases, ToIntFunction<String> width, int maxWidth)
+	{
+		int separatorWidth = width.applyAsInt(PHRASE_SEPARATOR);
+		List<List<String>> rows = new ArrayList<>();
+		List<String> row = new ArrayList<>();
+		int rowWidth = 0;
+		for (String phrase : phrases)
+		{
+			int phraseWidth = width.applyAsInt(phrase);
+			if (!row.isEmpty() && rowWidth + separatorWidth + phraseWidth > maxWidth)
 			{
-				rows.add(centeredRow(row.toString()));
-				row.setLength(0);
+				rows.add(row);
+				row = new ArrayList<>();
 				rowWidth = 0;
 			}
-			if (row.length() > 0)
-			{
-				row.append(Html.muted(separator));
-				rowWidth += separatorWidth;
-			}
-			row.append(Html.color(phrase.getValue(), Html.escape(phrase.getKey())));
-			rowWidth += width;
+			rowWidth += (row.isEmpty() ? 0 : separatorWidth) + phraseWidth;
+			row.add(phrase);
 		}
-		if (row.length() > 0)
+		if (!row.isEmpty())
 		{
-			rows.add(centeredRow(row.toString()));
+			rows.add(row);
 		}
 		return rows;
 	}
