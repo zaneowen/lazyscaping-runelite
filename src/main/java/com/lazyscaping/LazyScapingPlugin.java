@@ -27,17 +27,10 @@ import javax.inject.Inject;
 import javax.swing.SwingUtilities;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
-import net.runelite.api.events.DecorativeObjectDespawned;
-import net.runelite.api.events.DecorativeObjectSpawned;
-import net.runelite.api.events.GameObjectDespawned;
-import net.runelite.api.events.GameObjectSpawned;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.ItemContainerChanged;
-import net.runelite.api.events.MenuOptionClicked;
 import net.runelite.api.events.StatChanged;
-import net.runelite.api.events.WallObjectDespawned;
-import net.runelite.api.events.WallObjectSpawned;
 import net.runelite.api.events.WidgetLoaded;
 import net.runelite.api.Experience;
 import net.runelite.api.GameState;
@@ -46,6 +39,7 @@ import net.runelite.api.gameval.InventoryID;
 import net.runelite.api.Skill;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
+import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.plugins.banktags.BankTagsPlugin;
@@ -126,6 +120,9 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 	private HouseReader houseReader;
 
 	@Inject
+	private EventBus eventBus;
+
+	@Inject
 	private Gson gson;
 
 	private volatile LazyScapingPanel panel;
@@ -183,6 +180,7 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 			.panel(panel)
 			.build();
 		clientToolbar.addNavigation(navButton);
+		eventBus.register(houseReader);
 
 		if (config.liveRecommendations())
 		{
@@ -194,6 +192,7 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 	@Override
 	protected void shutDown()
 	{
+		eventBus.unregister(houseReader);
 		clientToolbar.removeNavigation(navButton);
 		navButton = null;
 		panel = null;
@@ -214,8 +213,6 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 		{
 			// the player's name and stats arrive over the next tick or two
 			loadPending = true;
-			// also after every area loads, which may be the player's house
-			houseReader.onSceneLoaded();
 		}
 		else if (event.getGameState() == GameState.LOGIN_SCREEN)
 		{
@@ -229,10 +226,6 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 	public void onGameTick(GameTick tick)
 	{
 		tickCount++;
-		if (config.readHouse())
-		{
-			houseReader.onTick(tickCount);
-		}
 		if (loadPending)
 		{
 			String name = account.name();
@@ -343,56 +336,6 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 			// the bank's items load after its interface
 			clientThread.invokeLater(bankTagLoader::onBankOpened);
 		}
-		else if (event.getGroupId() == InterfaceID.TELENEXUS_TELEPORT)
-		{
-			houseReader.onNexusMenuOpened();
-		}
-		else if (event.getGroupId() == InterfaceID.POH_BOARD)
-		{
-			houseReader.onAdvertisementBoardOpened();
-		}
-	}
-
-	@Subscribe
-	public void onMenuOptionClicked(MenuOptionClicked event)
-	{
-		houseReader.onMenuOptionClicked(event, tickCount);
-	}
-
-	@Subscribe
-	public void onGameObjectSpawned(GameObjectSpawned event)
-	{
-		houseReader.onObjectChanged();
-	}
-
-	@Subscribe
-	public void onGameObjectDespawned(GameObjectDespawned event)
-	{
-		houseReader.onObjectChanged();
-	}
-
-	@Subscribe
-	public void onWallObjectSpawned(WallObjectSpawned event)
-	{
-		houseReader.onObjectChanged();
-	}
-
-	@Subscribe
-	public void onWallObjectDespawned(WallObjectDespawned event)
-	{
-		houseReader.onObjectChanged();
-	}
-
-	@Subscribe
-	public void onDecorativeObjectSpawned(DecorativeObjectSpawned event)
-	{
-		houseReader.onObjectChanged();
-	}
-
-	@Subscribe
-	public void onDecorativeObjectDespawned(DecorativeObjectDespawned event)
-	{
-		houseReader.onObjectChanged();
 	}
 
 	@Subscribe

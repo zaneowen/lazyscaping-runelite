@@ -16,13 +16,24 @@ import javax.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.GameObject;
+import net.runelite.api.GameState;
 import net.runelite.api.Tile;
 import net.runelite.api.TileObject;
+import net.runelite.api.events.DecorativeObjectDespawned;
+import net.runelite.api.events.DecorativeObjectSpawned;
+import net.runelite.api.events.GameObjectDespawned;
+import net.runelite.api.events.GameObjectSpawned;
+import net.runelite.api.events.GameStateChanged;
+import net.runelite.api.events.GameTick;
 import net.runelite.api.events.MenuOptionClicked;
+import net.runelite.api.events.WallObjectDespawned;
+import net.runelite.api.events.WallObjectSpawned;
+import net.runelite.api.events.WidgetLoaded;
 import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.gameval.ObjectID;
 import net.runelite.api.widgets.Widget;
 import net.runelite.client.config.ConfigManager;
+import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.util.Text;
 
 /**
@@ -33,7 +44,7 @@ import net.runelite.client.util.Text;
  * <p>The game doesn't say whose house is loaded, so a house only counts as the
  * player's own when they entered it a way that only leads there: the house
  * portal's Home or Build mode, a house tablet, the Teleport to House spell or a
- * Construction cape. Used on the client thread.
+ * Construction cape. Registered on the event bus while the plugin runs.
  */
 @Slf4j
 @Singleton
@@ -160,6 +171,7 @@ class HouseReader
 
 	private final Client client;
 	private final ConfigManager configManager;
+	private final LazyScapingConfig config;
 
 	/** The tick the player last chose a way into their own house, or -1. */
 	private int ownEntryTick = -1;
@@ -170,20 +182,22 @@ class HouseReader
 	private boolean nexusPending;
 
 	@Inject
-	HouseReader(Client client, ConfigManager configManager)
+	HouseReader(Client client, ConfigManager configManager, LazyScapingConfig config)
 	{
 		this.client = client;
 		this.configManager = configManager;
+		this.config = config;
 	}
 
-	void onMenuOptionClicked(MenuOptionClicked event, int tick)
+	@Subscribe
+	public void onMenuOptionClicked(MenuOptionClicked event)
 	{
 		String option = Text.removeTags(event.getMenuOption()).toLowerCase(Locale.ROOT);
 		String target = Text.removeTags(event.getMenuTarget()).toLowerCase(Locale.ROOT);
 		boolean houseTeleport = (option.equals("break") || option.equals("inside") || option.equals("cast")) && target.contains("teleport to house");
 		if (option.equals("home") || option.equals("build mode") || option.equals("tele to poh") || houseTeleport)
 		{
-			ownEntryTick = tick;
+			ownEntryTick = client.getTickCount();
 		}
 		else if (option.equals("friend's house"))
 		{
@@ -191,38 +205,81 @@ class HouseReader
 		}
 	}
 
-	/** The house advertisement board was opened, which leads to other players' houses. */
-	void onAdvertisementBoardOpened()
+	@Subscribe
+	public void onWidgetLoaded(WidgetLoaded event)
 	{
-		ownEntryTick = -1;
+		if (event.getGroupId() == InterfaceID.TELENEXUS_TELEPORT)
+		{
+			nexusPending = inOwnHouse;
+		}
+		else if (event.getGroupId() == InterfaceID.POH_BOARD)
+		{
+			// the house advertisement board leads to other players' houses
+			ownEntryTick = -1;
+		}
 	}
 
-	/** An area loaded: check on the next tick whether it's the player's house. */
-	void onSceneLoaded()
+	/** After every area loads, check on the next tick whether it's the player's house. */
+	@Subscribe
+	public void onGameStateChanged(GameStateChanged event)
 	{
-		scanPending = true;
+		if (event.getGameState() == GameState.LOGGED_IN)
+		{
+			scanPending = true;
+		}
 	}
 
-	/** An object appeared or went: furniture may have been built or removed. */
-	void onObjectChanged()
+	@Subscribe
+	public void onGameObjectSpawned(GameObjectSpawned event)
+	{
+		objectChanged();
+	}
+
+	@Subscribe
+	public void onGameObjectDespawned(GameObjectDespawned event)
+	{
+		objectChanged();
+	}
+
+	@Subscribe
+	public void onWallObjectSpawned(WallObjectSpawned event)
+	{
+		objectChanged();
+	}
+
+	@Subscribe
+	public void onWallObjectDespawned(WallObjectDespawned event)
+	{
+		objectChanged();
+	}
+
+	@Subscribe
+	public void onDecorativeObjectSpawned(DecorativeObjectSpawned event)
+	{
+		objectChanged();
+	}
+
+	@Subscribe
+	public void onDecorativeObjectDespawned(DecorativeObjectDespawned event)
+	{
+		objectChanged();
+	}
+
+	/** Furniture may have been built or removed. */
+	private void objectChanged()
 	{
 		// also while the house may still be loading after the player chose to go there
 		scanPending |= inOwnHouse || ownEntryTick != -1;
 	}
 
-	void onNexusMenuOpened()
+	/** Reads anything pending, once a tick. */
+	@Subscribe
+	public void onGameTick(GameTick tick)
 	{
-		nexusPending = inOwnHouse;
-	}
-
-	/**
-	 * Reads anything pending. Called once a tick.
-	 *
-	 * @return whether any house setting changed
-	 */
-	boolean onTick(int tick)
-	{
-		boolean changed = false;
+		if (!config.readHouse())
+		{
+			return;
+		}
 		if (nexusPending)
 		{
 			nexusPending = false;
@@ -232,24 +289,23 @@ class HouseReader
 		if (scanPending)
 		{
 			scanPending = false;
-			changed = scan();
+			scan();
 		}
-		if (ownEntryTick != -1 && tick - ownEntryTick > ENTRY_TICKS)
+		if (ownEntryTick != -1 && client.getTickCount() - ownEntryTick > ENTRY_TICKS)
 		{
 			ownEntryTick = -1;
 		}
-		return changed;
 	}
 
 	/** Reads the furniture if the player is in their own house, and updates the settings. */
-	private boolean scan()
+	private void scan()
 	{
 		Set<Integer> objects = inOwnHouse || ownEntryTick != -1 ? sceneObjects() : Set.of();
 		if (!objects.contains(ObjectID.POH_EXIT_PORTAL))
 		{
 			inOwnHouse = false;
 			nexus = null;
-			return false;
+			return;
 		}
 		inOwnHouse = true;
 		ownEntryTick = -1;
@@ -283,7 +339,6 @@ class HouseReader
 		{
 			log.debug("Read the house: {}", changes);
 		}
-		return !changes.isEmpty();
 	}
 
 	private Set<Integer> sceneObjects()

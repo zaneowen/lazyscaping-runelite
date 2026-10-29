@@ -85,7 +85,7 @@ final class MethodDetails
 		addList("How to", guide.getSteps(), true);
 		if (guide.getWiki() != null)
 		{
-			panel.add(Components.spaced(Components.link("Full guide on the OSRS Wiki", () -> actions.openWiki(guide.getWiki())), 4));
+			panel.add(Components.spaced(Components.centered(Components.textButton("Full guide on the OSRS Wiki", () -> actions.openWiki(guide.getWiki()))), 6));
 		}
 	}
 

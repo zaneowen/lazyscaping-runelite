@@ -45,7 +45,7 @@ Goals, picked methods, bosses, Slayer tasks and budgets are saved per account.
 
 With *Live recommendations* off, the plugin makes no network requests. Sync only opens a link in your browser.
 
-With it on, the plugin sends what it needs to build your plan and gear setups to lazyscaping.app. The site uses it to answer the request and doesn't store it. Your RuneScape name and your bank are never sent: the gear you own is matched on your computer against the site's gear list, and only the matching LazyScaping gear ids are sent. Data goes in the request body over HTTPS, never in the URL.
+With it on, the plugin sends what it needs to build your plan and gear setups to lazyscaping.app. The site uses it to answer the request and doesn't store it. Your RuneScape name and your bank are never sent: the gear you own is matched on your computer against the site's gear list, and only the matching LazyScaping gear ids are sent. Data goes in the request body over HTTPS, never in the URL. Reading your house happens on your computer too: only the house settings it ticks are sent.
 
 ### What's sent, and when
 
@@ -55,7 +55,7 @@ All requests go to `https://lazyscaping.app` and are made in the background, nev
 |---|---|---|
 | `GET /api/plugin/v1/catalog` | When the plugin starts with *Live recommendations* on, or when you turn it on | Nothing. It fetches the site's gear names, bosses and Slayer tasks, so new gear is recognised without a plugin update. |
 | `POST /api/plugin/v1/plan` | When you log in, change your goal, method, *Plan priority* or training budget, gain a level, or click *Refresh* | Goal skill, its xp and target level; all skill levels; members and ironman flags; quest unlocks that open training methods; plan priority; training budget in gp; picked method. |
-| `POST /api/plugin/v1/gear` | When you log in, pick a boss, Slayer task or style, change your gear budget or house settings, get or lose gear (at most once a minute), or click *Refresh* | The boss or task and style; all skill levels; LazyScaping ids of the gear you own; members and ironman flags; gear budget in gp; whether the elite Lumbridge Diary is done; the house teleports you tick. |
+| `POST /api/plugin/v1/gear` | When you log in, pick a boss, Slayer task, team size or style, try or undo an upgrade, change your gear budget or house settings, get or lose gear (at most once a minute), or click *Refresh* | The boss or task, team size and style; all skill levels; LazyScaping ids of the gear you own, and of any upgrades you're trying; members and ironman flags; gear budget in gp; whether the elite Lumbridge Diary is done; the house teleports in your settings. |
 | `GET` item pictures | When a setup shows an untradeable item | Nothing. Pictures of tradeable items come from RuneLite. |
 
 The *Open my planner on lazyscaping.app* button is separate: it opens a link in your browser with your name, account type, goal, gear and quest unlocks after the `#`, which browsers don't send to the server. It works with *Live recommendations* off.
