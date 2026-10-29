@@ -20,6 +20,9 @@ public interface PanelActions
 	/** The player said whether to plan Slayer gear with a Slayer helmet (i). */
 	void slayerHelmetChanged(boolean planWithHelmet);
 
+	/** A team size, "solo" or "group", was picked for a setup. */
+	void teamSelected(GearTarget target, String team);
+
 	/** A combat style was picked for a setup. */
 	void styleSelected(GearTarget target, String style);
 

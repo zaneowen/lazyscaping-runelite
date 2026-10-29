@@ -20,6 +20,12 @@ class ProfileSettings
 	static final String TRAINING_BUDGET = "trainingBudget";
 	static final String GEAR_BUDGET = "gearBudget";
 
+	/** The team size picked for a boss. */
+	static String team(String bossId)
+	{
+		return "team." + bossId;
+	}
+
 	private final ConfigManager configManager;
 
 	@Inject

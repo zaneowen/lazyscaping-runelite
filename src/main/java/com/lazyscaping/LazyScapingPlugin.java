@@ -515,6 +515,21 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 	}
 
 	@Override
+	public void teamSelected(GearTarget target, String team)
+	{
+		clientThread.invoke(() ->
+		{
+			GearPlan plan = gearPlans.get(target);
+			plan.team = team;
+			if (plan.selectedId != null)
+			{
+				saveIfLoggedIn(ProfileSettings.team(plan.selectedId), team);
+			}
+			fetchGearSetup(plan);
+		});
+	}
+
+	@Override
 	public void budgetChanged(boolean gear, String budget)
 	{
 		clientThread.invoke(() ->
@@ -641,6 +656,7 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 		boss.reset();
 		slayer.reset();
 		boss.selectedId = settings.get(ProfileSettings.GEAR_BOSS);
+		boss.team = savedTeam(boss.selectedId);
 		slayer.selectedId = settings.get(ProfileSettings.SLAYER_TASK);
 		slayerTaskName = null;
 		String savedHelmet = settings.get(ProfileSettings.SLAYER_HELMET);
@@ -669,11 +685,18 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 		fetchGearSetups();
 	}
 
+	/** The team size saved for a boss, or null for its usual one. */
+	private String savedTeam(String bossId)
+	{
+		return bossId == null ? null : settings.get(ProfileSettings.team(bossId));
+	}
+
 	private void selectGear(GearTarget target, String id, String settingKey)
 	{
 		GearPlan plan = gearPlans.get(target);
 		plan.selectedId = id;
 		plan.reset();
+		plan.team = savedTeam(id);
 		saveIfLoggedIn(settingKey, id);
 		updatePanel(p -> p.showBankMessage(target, null));
 		fetchGearSetup(plan);
@@ -834,6 +857,10 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 		if (plan.style != null)
 		{
 			body.addProperty("style", plan.style);
+		}
+		if (plan.team != null)
+		{
+			body.addProperty("team", plan.team);
 		}
 		body.add("levels", account.levels());
 		body.add("owned", gson.toJsonTree(owned));

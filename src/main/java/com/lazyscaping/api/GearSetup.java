@@ -11,6 +11,8 @@ public class GearSetup
 	private Boss boss;
 	/** Set when the setup is for a Slayer task. */
 	private SlayerTask task;
+	/** Set for bosses fought solo or in a group. */
+	private TeamOptions team;
 	private String style;
 	/** Styles the boss can be fought with. */
 	private List<String> styles = Collections.emptyList();

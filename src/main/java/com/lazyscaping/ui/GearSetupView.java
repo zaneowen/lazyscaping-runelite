@@ -4,6 +4,7 @@ import com.lazyscaping.Budget;
 import com.lazyscaping.api.GearSetup;
 import com.lazyscaping.api.GearSlot;
 import com.lazyscaping.api.GearSwitch;
+import com.lazyscaping.api.TeamOptions;
 import java.util.ArrayList;
 import java.util.List;
 import javax.swing.JButton;
@@ -13,7 +14,7 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 
 /**
- * A gear setup with its style and budget pickers: the worn gear, what a budget
+ * A gear setup with its team, style and budget pickers: the worn gear, what a budget
  * buys, the packed inventory and how to get there. Shared by the Bossing and
  * Slayer tabs.
  */
@@ -22,6 +23,10 @@ class GearSetupView
 	private final PanelActions actions;
 	private final IconLoader icons;
 
+	private final JComboBox<TeamOptions.Option> teamBox = new JComboBox<>();
+	private final JComponent teamRow = Components.labeledRow("Team", teamBox);
+	/** What changes for the picked team size. */
+	private final JLabel teamSummary = Components.label("");
 	private final JComboBox<String> styleBox = new JComboBox<>();
 	private final JComponent styleRow = Components.labeledRow("Style", styleBox);
 	private final BudgetPicker budget;
@@ -38,6 +43,18 @@ class GearSetupView
 		this.icons = icons;
 		budget = new BudgetPicker(Budget.GEAR_PRESETS, "Gp to spend on gear upgrades and supplies", b -> actions.budgetChanged(true, b));
 
+		teamBox.setToolTipText("Solo or in a group: the gear and supplies differ");
+		teamBox.addActionListener(e ->
+		{
+			TeamOptions.Option option = (TeamOptions.Option) teamBox.getSelectedItem();
+			if (!updating && option != null)
+			{
+				actions.teamSelected(target, option.getId());
+			}
+		});
+		teamRow.setVisible(false);
+		teamSummary.setVisible(false);
+
 		styleBox.setToolTipText("Combat style");
 		styleBox.addActionListener(e ->
 		{
@@ -52,6 +69,9 @@ class GearSetupView
 		bankButton.addActionListener(e -> actions.showInBank(target));
 		bankMessage.setVisible(false);
 
+		panel.add(teamRow);
+		panel.add(Components.spaced(teamSummary, 2));
+		panel.add(Components.gap(2));
 		panel.add(styleRow);
 		panel.add(budget);
 		panel.add(setupPanel);
@@ -74,9 +94,11 @@ class GearSetupView
 		budget.setCoins(coins);
 	}
 
-	/** Hides the style picker until the next setup arrives, since styles differ between bosses. */
+	/** Hides the team and style pickers until the next setup arrives, since they differ between bosses. */
 	void resetStyle()
 	{
+		teamRow.setVisible(false);
+		teamSummary.setVisible(false);
 		styleRow.setVisible(false);
 	}
 
@@ -92,13 +114,34 @@ class GearSetupView
 
 	void showBankMessage(String message)
 	{
-		bankMessage.setText(message == null ? "" : "<html>" + Html.muted(Html.escape(message)) + "</html>");
+		bankMessage.setText(message == null ? "" : "<html><body style='width:" + Components.TEXT_WIDTH + "px;text-align:center'>" + Html.muted(Html.escape(message)) + "</body></html>");
 		bankMessage.setVisible(message != null);
+	}
+
+	private void showTeam(TeamOptions team)
+	{
+		teamBox.removeAllItems();
+		teamRow.setVisible(team != null);
+		teamSummary.setVisible(team != null);
+		if (team == null)
+		{
+			return;
+		}
+		for (TeamOptions.Option option : team.getOptions())
+		{
+			teamBox.addItem(option);
+			if (option.getId().equals(team.getSelected()))
+			{
+				teamBox.setSelectedItem(option);
+				teamSummary.setText(Html.muted(Html.escape(option.getSummary())));
+			}
+		}
 	}
 
 	void showSetup(GearSetup setup)
 	{
 		updating = true;
+		showTeam(setup.getTeam());
 		styleBox.removeAllItems();
 		setup.getStyles().forEach(styleBox::addItem);
 		styleBox.setSelectedItem(setup.getStyle());
@@ -195,7 +238,7 @@ class GearSetupView
 		String slots = Html.keep(empty + " empty");
 		if (empty == untradeable)
 		{
-			return slots + Html.muted(", " + Html.keep(untradeable == 1 ? "needs an untradeable" : "need untradeables"));
+			return slots + Html.muted(", " + (untradeable == 1 ? "needs an untradeable" : "need untradeables"));
 		}
 		return slots + Html.muted(",") + " " + Html.color(Html.GOLD, Html.keep(Format.gp(cost))) + " " + Html.keep("to fill")
 			+ (untradeable > 0 ? " " + Html.muted(Html.keep("(+" + untradeable + " untradeable)")) : "");

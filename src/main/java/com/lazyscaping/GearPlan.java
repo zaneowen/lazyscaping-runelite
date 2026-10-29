@@ -14,6 +14,8 @@ final class GearPlan
 	final GearTarget target;
 	/** The boss or Slayer task id. */
 	String selectedId;
+	/** "solo" or "group" for bosses fought either way, or null for the boss's usual one. */
+	String team;
 	/** The picked combat style, or null for the best one for the player's gear. */
 	String style;
 	/** The latest setup, for the ready check and bank tag. */
@@ -31,6 +33,7 @@ final class GearPlan
 	void reset()
 	{
 		style = null;
+		team = null;
 		setup = null;
 		fetchedWith = Collections.emptySet();
 	}
