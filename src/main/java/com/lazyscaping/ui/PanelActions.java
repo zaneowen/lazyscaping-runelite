@@ -23,6 +23,9 @@ public interface PanelActions
 	/** An upgrade was picked to try in a setup, planned as if owned. */
 	void tryUpgrade(GearTarget target, String gearId);
 
+	/** Stops trying one upgrade. */
+	void untryUpgrade(GearTarget target, String gearId);
+
 	/** Stops trying upgrades, going back to the gear the player owns. */
 	void stopTrying(GearTarget target);
 
@@ -45,6 +48,12 @@ public interface PanelActions
 	void openGearPlan(GearTarget target);
 
 	void openWiki(String url);
+
+	/** Whether a foldable section of the panel was left open. */
+	boolean isSectionOpen(String name);
+
+	/** A foldable section was opened or closed, to remember for next time. */
+	void sectionToggled(String name, boolean open);
 
 	void refresh();
 }

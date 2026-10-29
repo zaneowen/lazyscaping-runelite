@@ -61,17 +61,16 @@ final class InventoryView
 	{
 	}
 
-	static void addTo(JPanel parent, GearSetup setup, IconLoader icons)
+	static void addTo(JPanel parent, GearSetup setup, IconLoader icons, PanelActions actions)
 	{
 		List<InventorySlot> slots = setup.getInventory();
 		int size = setup.getInventorySize() > 0 ? setup.getInventorySize() : DEFAULT_SIZE;
-		parent.add(Components.subheading("Inventory"));
 		Map<String, Color> summary = new LinkedHashMap<>();
 		summary.put(slots.size() + "/" + size + " slots", Html.MUTED);
 		summary.put("supplies " + Format.gp(setup.getTripCost()) + " a trip", Html.MUTED);
 		parent.add(Components.centeredPhrases(summary));
 		parent.add(Components.centeredPhrases(slotCounts(slots)));
-		parent.add(Components.spaced(grid(slots, size, setup.getRunePouch(), icons), 6));
+		parent.add(Components.spaced(grid(slots, size, setup.getRunePouch(), icons, actions), 6));
 
 		if (setup.getFoodCut() > 0)
 		{
@@ -82,7 +81,8 @@ final class InventoryView
 			String items = setup.getOverflow() == 1 ? " more item won't" : " more items won't";
 			parent.add(Components.spaced(Components.label(Html.wrapCentered(Html.color(Html.RED, setup.getOverflow() + items + " fit in one inventory."), Components.TEXT_WIDTH)), 4));
 		}
-		parent.add(contents(slots, setup.getRunePouch()));
+		// the grid's pictures already show the items, so the list waits until it's wanted
+		parent.add(Components.disclosure("Item list", contents(slots, setup.getRunePouch())));
 	}
 
 	/** How many slots each kind of item takes, coloured like the slot borders. */
@@ -95,12 +95,18 @@ final class InventoryView
 		return phrases;
 	}
 
-	private static JPanel grid(List<InventorySlot> slots, int size, List<RunePouchEntry> runePouch, IconLoader icons)
+	private static JPanel grid(List<InventorySlot> slots, int size, List<RunePouchEntry> runePouch, IconLoader icons, PanelActions actions)
 	{
 		List<JLabel> cells = new ArrayList<>();
 		for (int i = 0; i < size; i++)
 		{
-			cells.add(cell(i < slots.size() ? slots.get(i) : null, runePouch, icons));
+			InventorySlot slot = i < slots.size() ? slots.get(i) : null;
+			JLabel cell = cell(slot, runePouch, icons);
+			if (slot != null)
+			{
+				Components.linkToWiki(cell, slot.getName(), actions);
+			}
+			cells.add(cell);
 		}
 		return Components.itemGrid(COLUMNS, cells);
 	}
@@ -148,6 +154,7 @@ final class InventoryView
 			tip.append("<br>Holds:");
 			runePouch.forEach(rune -> tip.append("<br>- ").append(rune.getQty()).append(" x ").append(Html.escape(rune.getName())));
 		}
+		tip.append("<br>").append(Html.muted("Click for the wiki"));
 		return tip.toString();
 	}
 

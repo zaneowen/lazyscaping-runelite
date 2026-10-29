@@ -21,7 +21,11 @@ The side panel has three tabs.
 - **Gear setup.** Pick a boss, by name or narrowed to a type like *Slayer bosses* or *Raids*, to see the best setup from the gear you own: each worn slot's item with its picture, what to get next and its GE price, the packed inventory with switches, the special attack weapon and supplies, and how to get there. With a budget, it also buys the best upgrades you can afford (not for ironmen).
 - **Solo or group.** Bosses with solo and group builds, like the raids, Nex and the God Wars generals, have a *Team* picker. The choice is saved per boss.
 - **Equipment stats.** The worn gear's total bonuses, laid out like the in-game equipment stats screen, with the ones that matter for your style in gold.
-- **Try upgrades.** Click *Try upgrade* under any slot to see the setup as if you had the next item, switches and inventory included. Try as many as you like, then *Back to my gear* returns to what you own.
+- **Try upgrades.** Click *Try upgrade* under any slot to see the setup as if you had the next item, switches and inventory included. *Undo* drops one, and *Back to my gear* drops them all. The overview shows what they add in kills and gp an hour.
+- **Pace and profit.** For bosses with a wiki money making guide, the overview estimates your kills and gp an hour at the pace your gear and levels allow.
+- **Best upgrades.** The upgrades that do the most for their price, one per slot, with what each adds and how soon it pays for itself.
+- **Fight tips.** Click *Fight tips* for the fight's tips, which spellbook to be on and whether to use thralls. The *Style* picker marks the style your gear suits best.
+- **Easy to scan.** Each section folds away by clicking its heading, and stays how you left it. Click any item's picture for its wiki page, and hover a stat for what it does.
 
 **Slayer**
 - **Your task.** The task from RuneLite's Slayer plugin, with kills left, is picked automatically; you can also pick any task. It shows the requirements, where to kill them and tips.

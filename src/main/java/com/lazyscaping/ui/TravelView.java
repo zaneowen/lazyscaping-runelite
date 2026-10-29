@@ -19,7 +19,6 @@ final class TravelView
 			return;
 		}
 
-		parent.add(Components.subheading("Getting there"));
 		if (travel.getQuest() != null)
 		{
 			parent.add(Components.spaced(Components.label(Html.white("Quest:") + " " + Html.escape(travel.getQuest())), 4));
@@ -33,6 +32,7 @@ final class TravelView
 		{
 			JLabel picture = Components.picture();
 			icons.loadItem(teleport, 1, false, picture);
+			Components.linkToWiki(picture, teleport.getName(), actions);
 			parent.add(Components.pictureRow(picture, Html.escape(teleport.getName()) + "<br>" + Html.muted(Html.escape(teleport.getWhere()))));
 		}
 

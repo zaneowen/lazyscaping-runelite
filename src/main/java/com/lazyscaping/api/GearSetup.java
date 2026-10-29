@@ -16,6 +16,13 @@ public class GearSetup
 	private String style;
 	/** Styles the boss can be fought with. */
 	private List<String> styles = Collections.emptyList();
+	/** The style the player's gear suits best, or null when the boss has one style. */
+	private String bestStyle;
+	private FightNotes notes;
+	/** Null when the boss has no money making guide. */
+	private Profit profit;
+	/** The upgrades that do the most for their price, one per slot. */
+	private List<UpgradeOption> upgrades = Collections.emptyList();
 	/** Set when no gear can be brought, saying why. */
 	private String noGear;
 	private List<GearSlot> picks = Collections.emptyList();
@@ -24,7 +31,7 @@ public class GearSetup
 	 * five attack bonuses, five defence bonuses, then melee strength, ranged
 	 * strength, magic damage % and prayer.
 	 */
-	private List<Integer> stats = Collections.emptyList();
+	private List<Double> stats = Collections.emptyList();
 	/** Indexes into {@link #stats} of the bonuses that matter most for the style. */
 	private List<Integer> keyStats = Collections.emptyList();
 	private List<GearSwitch> switches = Collections.emptyList();

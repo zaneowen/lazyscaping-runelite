@@ -80,6 +80,8 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 	private static final int UPDATE_TICKS = 5;
 	private static final String WIKI_HOST = "oldschool.runescape.wiki";
 	private static final String SLAYER_HELMET = "slayer_helmet_i";
+	/** Settings key for the panel sections the player has folded. Not shown in the settings. */
+	private static final String CLOSED_SECTIONS = "closedSections";
 
 	@Inject
 	private Client client;
@@ -526,6 +528,45 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 	}
 
 	@Override
+	public void untryUpgrade(GearTarget target, String gearId)
+	{
+		clientThread.invoke(() ->
+		{
+			GearPlan plan = gearPlans.get(target);
+			plan.trying.remove(gearId);
+			fetchGearSetup(plan);
+		});
+	}
+
+	@Override
+	public boolean isSectionOpen(String name)
+	{
+		return !closedSections().contains(name);
+	}
+
+	@Override
+	public void sectionToggled(String name, boolean open)
+	{
+		Set<String> closed = new TreeSet<>(closedSections());
+		if (open)
+		{
+			closed.remove(name);
+		}
+		else
+		{
+			closed.add(name);
+		}
+		configManager.setConfiguration(LazyScapingConfig.GROUP, CLOSED_SECTIONS, String.join(",", closed));
+	}
+
+	/** Sections of the panel the player has folded, by name. */
+	private Set<String> closedSections()
+	{
+		String saved = configManager.getConfiguration(LazyScapingConfig.GROUP, CLOSED_SECTIONS);
+		return Strings.isNullOrEmpty(saved) ? Set.of() : Set.of(saved.split(","));
+	}
+
+	@Override
 	public void stopTrying(GearTarget target)
 	{
 		clientThread.invoke(() ->
@@ -886,6 +927,8 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 		{
 			body.addProperty("team", plan.team);
 		}
+		// so the site can say what they add over the player's own gear
+		body.add("trying", gson.toJsonTree(plan.trying));
 		body.add("levels", account.levels());
 		body.add("owned", gson.toJsonTree(owned));
 		body.addProperty("members", account.isMember());

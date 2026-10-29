@@ -3,16 +3,23 @@ package com.lazyscaping.ui;
 import com.lazyscaping.Budget;
 import com.lazyscaping.api.GearSetup;
 import com.lazyscaping.api.GearSlot;
+import com.lazyscaping.api.FightNotes;
 import com.lazyscaping.api.GearSwitch;
+import com.lazyscaping.api.Profit;
 import com.lazyscaping.api.TeamOptions;
+import com.lazyscaping.api.UpgradeOption;
+import java.awt.Component;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
+import java.util.function.Consumer;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.ListCellRenderer;
 import javax.swing.border.EmptyBorder;
 import net.runelite.client.ui.ColorScheme;
 
@@ -40,6 +47,8 @@ class GearSetupView
 	private final JPanel panel = Components.column();
 
 	private boolean updating;
+	/** The style the shown setup's gear suits best, or null. */
+	private String bestStyle;
 	/** Gear ids of the upgrades being tried in the setup shown. */
 	private Set<String> trying = Set.of();
 
@@ -63,6 +72,17 @@ class GearSetupView
 		teamSummary.setVisible(false);
 
 		styleBox.setToolTipText("Combat style");
+		// marks the style the player's gear suits best
+		ListCellRenderer<? super String> styleRenderer = styleBox.getRenderer();
+		styleBox.setRenderer((list, value, index, selected, focused) ->
+		{
+			Component cell = styleRenderer.getListCellRendererComponent(list, value, index, selected, focused);
+			if (value != null && value.equals(bestStyle) && cell instanceof JLabel)
+			{
+				((JLabel) cell).setText(value + " (best fit)");
+			}
+			return cell;
+		});
 		styleBox.addActionListener(e ->
 		{
 			if (!updating)
@@ -149,6 +169,7 @@ class GearSetupView
 	void showSetup(GearSetup setup, Set<String> trying)
 	{
 		this.trying = trying;
+		bestStyle = setup.getBestStyle();
 		updating = true;
 		showTeam(setup.getTeam());
 		styleBox.removeAllItems();
@@ -163,49 +184,171 @@ class GearSetupView
 		{
 			setupPanel.add(tryingBar(setup));
 		}
-		setupPanel.add(Components.subheading("Overview"));
-		if (!styleRow.isVisible())
+		setupPanel.add(Components.section("Overview", overview(setup), actions));
+		if (target == GearTarget.BOSS && setup.getNotes() != null)
 		{
-			setupPanel.add(Components.fact("Style", Html.escape(setup.getStyle())));
-		}
-		setupPanel.add(Components.fact("Gear", gearSource(setup)));
-		if (setup.getNoGear() != null)
-		{
-			setupPanel.add(Components.spaced(Components.label(Html.escape(setup.getNoGear())), 6));
-		}
-		else
-		{
-			addSummary(setup);
-			setupPanel.add(Components.gap(8));
-			setupPanel.add(Components.fullWidth(bankButton));
-			setupPanel.add(Components.fullWidth(bankMessage));
-
-			setupPanel.add(Components.subheading("Worn gear"));
-			setup.getPicks().forEach(slot -> setupPanel.add(slotRow(slot)));
-			setupPanel.add(switchDetails(setup));
-			StatsView.addTo(setupPanel, setup);
+			setupPanel.add(fightTips(setup.getNotes()));
 		}
 
+		if (setup.getNoGear() == null)
+		{
+			JPanel worn = Components.column();
+			setup.getPicks().forEach(slot -> worn.add(slotRow(slot)));
+			worn.add(bestUpgrades(setup));
+			worn.add(switchDetails(setup));
+			setupPanel.add(Components.section("Worn gear", worn, actions));
+			addSection("Equipment stats", body -> StatsView.addTo(body, setup));
+		}
 		if (!setup.getInventory().isEmpty())
 		{
-			InventoryView.addTo(setupPanel, setup, icons);
+			addSection("Inventory", body -> InventoryView.addTo(body, setup, icons, actions));
 		}
-		TravelView.addTo(setupPanel, setup.getTravel(), actions, icons);
+		addSection("Getting there", body -> TravelView.addTo(body, setup.getTravel(), actions, icons));
 		Components.refresh(setupPanel);
 	}
 
-	private void addSummary(GearSetup setup)
+	/** Adds a foldable section, if {@code fill} puts anything in it. */
+	private void addSection(String title, Consumer<JPanel> fill)
 	{
+		JPanel body = Components.column();
+		fill.accept(body);
+		if (body.getComponentCount() > 0)
+		{
+			setupPanel.add(Components.section(title, body, actions));
+		}
+	}
+
+	/** The setup at a glance: where the gear comes from, what it costs, how fast it kills, and the bank tag button. */
+	private JPanel overview(GearSetup setup)
+	{
+		JPanel overview = Components.column();
+		if (!styleRow.isVisible())
+		{
+			overview.add(Components.fact("Style", Html.escape(setup.getStyle())));
+		}
+		else if (setup.getBestStyle() != null && !setup.getBestStyle().equals(setup.getStyle()))
+		{
+			overview.add(Components.fact("Tip", Html.color(Html.GOLD, Html.escape(setup.getBestStyle())) + " suits your gear better"));
+		}
+		overview.add(Components.fact("Gear", gearSource(setup)));
+		if (setup.getNoGear() != null)
+		{
+			overview.add(Components.spaced(Components.label(Html.escape(setup.getNoGear())), 6));
+			return overview;
+		}
+
 		if (setup.getGearCost() > 0)
 		{
 			String of = setup.getBudget() != null ? " " + Html.muted(Html.keep("of " + Format.gp(setup.getBudget()))) : "";
-			setupPanel.add(Components.fact("Buying", Html.color(Html.GOLD, Html.keep(Format.gp(setup.getGearCost()))) + of));
+			overview.add(Components.fact("Buying", Html.color(Html.GOLD, Html.keep(Format.gp(setup.getGearCost()))) + of));
 		}
-		setupPanel.add(Components.fact("Slots", emptySlotsSummary(setup)));
+		overview.add(Components.fact("Slots", emptySlotsSummary(setup)));
+		addProfit(overview, setup.getProfit());
 		if (setup.isSuppliesOverBudget())
 		{
-			setupPanel.add(Components.spaced(Components.label(Html.color(Html.RED, "Supplies cost more than your budget, so no gear was bought.")), 6));
+			overview.add(Components.spaced(Components.label(Html.color(Html.RED, "Supplies cost more than your budget, so no gear was bought.")), 6));
 		}
+		overview.add(Components.gap(8));
+		overview.add(Components.fullWidth(bankButton));
+		overview.add(Components.fullWidth(bankMessage));
+		return overview;
+	}
+
+	/** Kills and gp an hour from the boss's money making guide, and what tried upgrades add. */
+	private void addProfit(JPanel overview, Profit profit)
+	{
+		if (profit == null)
+		{
+			return;
+		}
+		Profit.Gain gain = profit.getTryingGain();
+		String kph = Html.keep(String.format(Locale.ROOT, "%.1f", profit.getKph()) + " kills/hr");
+		if (gain != null && gain.getKph() != 0)
+		{
+			kph += " " + signed(String.format(Locale.ROOT, "%+.1f", gain.getKph()), gain.getKph() > 0);
+		}
+		String gp = Html.color(Html.GOLD, Html.keep(Format.gp(profit.getGpPerHour()) + "/hr"));
+		if (gain != null && gain.getGpPerHour() != 0)
+		{
+			gp += " " + signed((gain.getGpPerHour() > 0 ? "+" : "-") + Format.gp(Math.abs(gain.getGpPerHour())), gain.getGpPerHour() > 0);
+		}
+
+		String about = "Estimated from the wiki's money making guide (" + profit.getGuide() + "), at the pace your gear and levels allow";
+		JComponent pace = Components.fact("Pace", kph);
+		JComponent money = Components.fact("Profit", gp);
+		pace.setToolTipText(about);
+		money.setToolTipText(about);
+		overview.add(pace);
+		overview.add(money);
+	}
+
+	private static String signed(String text, boolean up)
+	{
+		return Html.color(up ? Html.GREEN : Html.RED, Html.keep("(" + text + ")"));
+	}
+
+	/** The fight's tips, spellbook and thralls, folded away until clicked. */
+	private JComponent fightTips(FightNotes notes)
+	{
+		JPanel details = Components.column();
+		details.add(Components.gap(2));
+		details.add(Components.fact("Book", Html.escape(notes.getSpellbook() != null ? notes.getSpellbook() : "Any")));
+		if (notes.getThralls() != null)
+		{
+			details.add(Components.fact("Thralls", Html.escape(notes.getThralls())));
+		}
+		if (notes.getMagic() != null)
+		{
+			details.add(Components.spaced(Components.label(Html.muted(Html.escape(notes.getMagic()))), 4));
+		}
+		for (String tip : notes.getTips())
+		{
+			JPanel entry = Components.entry();
+			entry.add(Components.label(Html.escape(tip), Components.ENTRY_WIDTH));
+			details.add(entry);
+		}
+		return Components.disclosure("Fight tips", details);
+	}
+
+	/** The upgrades that do the most for their price, each with what it adds and a link to try it. */
+	private JComponent bestUpgrades(GearSetup setup)
+	{
+		JPanel list = Components.column();
+		for (UpgradeOption upgrade : setup.getUpgrades())
+		{
+			JLabel picture = Components.picture();
+			icons.loadItem(upgrade, 1, false, picture);
+			Components.linkToWiki(picture, upgrade.getName(), actions);
+
+			StringBuilder html = new StringBuilder(Html.muted(Html.escape(upgrade.getSlot()))).append("<br>")
+				.append(Html.color(Html.GOLD, Html.escape(upgrade.getName())));
+			if (upgrade.getPrice() != null)
+			{
+				html.append("<br>").append(Html.muted(Format.gp(upgrade.getPrice())));
+			}
+			html.append("<br>").append(gainText(upgrade));
+
+			JComponent link = trying.contains(upgrade.getId()) ? null
+				: Components.textButton("Try upgrade", () -> actions.tryUpgrade(target, upgrade.getId()));
+			list.add(Components.listRow(Components.pictureRow(picture, html.toString(), link)));
+		}
+		return list.getComponentCount() == 0 ? list : Components.disclosure("Best upgrades", list);
+	}
+
+	private static String gainText(UpgradeOption upgrade)
+	{
+		if (upgrade.getGpPerHour() == null)
+		{
+			return Html.color(Html.GREEN, Html.keep("+" + upgrade.getGearGain() + "% closer to the best"));
+		}
+		String gain = Html.color(Html.GREEN, Html.keep("+" + Format.gp(upgrade.getGpPerHour()) + "/hr"));
+		Double payback = upgrade.getPaybackHours();
+		if (payback == null)
+		{
+			return gain;
+		}
+		String when = payback < 1 ? "pays for itself within the hour" : "pays for itself in " + Format.hours(payback);
+		return gain + ", " + Html.muted(when);
 	}
 
 	/** Where the gear comes from. */
@@ -324,16 +467,23 @@ class GearSetupView
 		return slot.getItem() != null && slot.getItem().getId() != null && trying.contains(slot.getItem().getId());
 	}
 
-	/** A link to try a slot's next upgrade, or null when there's none to try. */
-	private JComponent tryLink(GearSlot slot)
+	/** Links to try a slot's next upgrade and to undo a tried one, or null when there are none. */
+	private JComponent slotLinks(GearSlot slot)
 	{
-		if (slot.getNext() == null || slot.getNext().getId() == null || slot.getStatus() == GearSlot.Status.TWO_HANDED)
+		List<JComponent> links = new ArrayList<>();
+		if (isTried(slot))
 		{
-			return null;
+			JLabel undo = Components.textButton("Undo", () -> actions.untryUpgrade(target, slot.getItem().getId()));
+			undo.setToolTipText("Stop trying " + slot.getItem().getName());
+			links.add(undo);
 		}
-		JLabel link = Components.textButton("Try upgrade", () -> actions.tryUpgrade(target, slot.getNext().getId()));
-		link.setToolTipText("See the setup as if you had " + slot.getNext().getName());
-		return link;
+		if (slot.getNext() != null && slot.getNext().getId() != null && slot.getStatus() != GearSlot.Status.TWO_HANDED)
+		{
+			JLabel tryIt = Components.textButton("Try upgrade", () -> actions.tryUpgrade(target, slot.getNext().getId()));
+			tryIt.setToolTipText("See the setup as if you had " + slot.getNext().getName());
+			links.add(tryIt);
+		}
+		return links.isEmpty() ? null : Components.links(links.toArray(new JComponent[0]));
 	}
 
 	/** One equipment slot: the item's picture, then the item and what to get next. */
@@ -372,6 +522,7 @@ class GearSetupView
 				}
 			}
 			icons.loadItem(slot.getItem(), 1, false, picture);
+			Components.linkToWiki(picture, slot.getItem().getName(), actions);
 		}
 		else if (slot.getNext() != null)
 		{
@@ -379,11 +530,12 @@ class GearSetupView
 			html.append(Html.color(slot.isMissingRequired() ? Html.RED : Html.GOLD, label + Html.escape(slot.getNext().getName())))
 				.append("<br>").append(Html.muted(slot.getNext().getPrice() != null ? Format.gp(slot.getNext().getPrice()) : "Untradeable"));
 			icons.loadItem(slot.getNext(), 1, true, picture);
+			Components.linkToWiki(picture, slot.getNext().getName(), actions);
 		}
 		else
 		{
 			html.append(Html.muted("Empty"));
 		}
-		return Components.listRow(Components.pictureRow(picture, html.toString(), tryLink(slot)));
+		return Components.listRow(Components.pictureRow(picture, html.toString(), slotLinks(slot)));
 	}
 }

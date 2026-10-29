@@ -5,8 +5,8 @@ import java.awt.Color;
 import java.awt.Component;
 import java.awt.Cursor;
 import java.awt.Dimension;
-import java.awt.FontMetrics;
 import java.awt.FlowLayout;
+import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.GridBagConstraints;
@@ -17,6 +17,8 @@ import java.awt.Polygon;
 import java.awt.RenderingHints;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import javax.swing.BorderFactory;
@@ -294,7 +296,44 @@ final class Components
 		JLabel name = new JLabel(text);
 		name.setFont(FontManager.getRunescapeSmallFont());
 		name.setForeground(Color.WHITE);
+		return headingRow(name);
+	}
 
+	/**
+	 * A section with a heading that folds it away when clicked, like
+	 * {@link #subheading} with an arrow. Whether it's open is remembered by name.
+	 */
+	static JComponent section(String title, JComponent body, PanelActions actions)
+	{
+		ArrowIcon arrow = new ArrowIcon();
+		JLabel name = new JLabel(title, arrow, SwingConstants.LEFT);
+		name.setFont(FontManager.getRunescapeSmallFont());
+		name.setForeground(Color.WHITE);
+		name.setIconTextGap(5);
+		JComponent heading = headingRow(name);
+		heading.setToolTipText("Click to show or hide");
+
+		boolean open = actions.isSectionOpen(title);
+		arrow.open = open;
+		body.setVisible(open);
+
+		JPanel section = column();
+		onClick(heading, () ->
+		{
+			boolean nowOpen = !body.isVisible();
+			body.setVisible(nowOpen);
+			arrow.open = nowOpen;
+			actions.sectionToggled(title, nowOpen);
+			section.revalidate();
+			section.repaint();
+		});
+		section.add(heading);
+		section.add(body);
+		return section;
+	}
+
+	private static JComponent headingRow(JLabel name)
+	{
 		JPanel row = new JPanel(new GridBagLayout());
 		row.setOpaque(false);
 		GridBagConstraints c = new GridBagConstraints();
@@ -427,6 +466,45 @@ final class Components
 		panel.add(spaced(fullWidth(bar), 8));
 		panel.add(details);
 		return panel;
+	}
+
+	/** The OSRS Wiki page for an item or anything else, by its name. */
+	static String wikiUrl(String name)
+	{
+		return "https://oldschool.runescape.wiki/w/" + URLEncoder.encode(name.replace(' ', '_'), StandardCharsets.UTF_8);
+	}
+
+	/** Makes an item's picture open its wiki page when clicked. */
+	static void linkToWiki(JComponent picture, String itemName, PanelActions actions)
+	{
+		if (itemName == null)
+		{
+			return;
+		}
+		onClick(picture, () -> actions.openWiki(wikiUrl(itemName)));
+		if (picture.getToolTipText() == null)
+		{
+			picture.setToolTipText(itemName + " (click for the wiki)");
+		}
+	}
+
+	/** Small links side by side, separated by dots. */
+	static JComponent links(JComponent... links)
+	{
+		JPanel row = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+		row.setOpaque(false);
+		for (int i = 0; i < links.length; i++)
+		{
+			if (i > 0)
+			{
+				JLabel dot = new JLabel(" · ");
+				dot.setFont(FontManager.getRunescapeSmallFont());
+				dot.setForeground(Html.MUTED);
+				row.add(dot);
+			}
+			row.add(links[i]);
+		}
+		return row;
 	}
 
 	/** A small triangle pointing right when closed and down when open. */
