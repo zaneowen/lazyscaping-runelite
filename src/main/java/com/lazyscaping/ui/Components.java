@@ -5,6 +5,7 @@ import java.awt.Color;
 import java.awt.Component;
 import java.awt.Cursor;
 import java.awt.Dimension;
+import java.awt.FontMetrics;
 import java.awt.FlowLayout;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
@@ -17,6 +18,7 @@ import java.awt.RenderingHints;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.List;
+import java.util.Map;
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.Icon;
@@ -235,6 +237,55 @@ final class Components
 		label.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
 		label.setText(html);
 		return label;
+	}
+
+	/**
+	 * Short coloured phrases in centred rows, as many to a row as fit and
+	 * separated by dots, so no row starts or ends with a dangling dot.
+	 */
+	static JComponent centeredPhrases(Map<String, Color> phrases)
+	{
+		FontMetrics metrics = new JLabel().getFontMetrics(FontManager.getRunescapeSmallFont());
+		// TEXT_WIDTH is in CSS pixels, which Swing draws about 4/3 larger
+		int maxWidth = TEXT_WIDTH * 4 / 3;
+		String separator = " · ";
+		int separatorWidth = metrics.stringWidth(separator);
+
+		JPanel rows = column();
+		StringBuilder row = new StringBuilder();
+		int rowWidth = 0;
+		for (Map.Entry<String, Color> phrase : phrases.entrySet())
+		{
+			int width = metrics.stringWidth(phrase.getKey());
+			if (row.length() > 0 && rowWidth + separatorWidth + width > maxWidth)
+			{
+				rows.add(centeredRow(row.toString()));
+				row.setLength(0);
+				rowWidth = 0;
+			}
+			if (row.length() > 0)
+			{
+				row.append(Html.muted(separator));
+				rowWidth += separatorWidth;
+			}
+			row.append(Html.color(phrase.getValue(), Html.escape(phrase.getKey())));
+			rowWidth += width;
+		}
+		if (row.length() > 0)
+		{
+			rows.add(centeredRow(row.toString()));
+		}
+		return rows;
+	}
+
+	private static JComponent centeredRow(String html)
+	{
+		JLabel label = centeredLabel();
+		label.setText("<html>" + html + "</html>");
+		JPanel row = new JPanel(new GridLayout(1, 1));
+		row.setOpaque(false);
+		row.add(label);
+		return row;
 	}
 
 	/** A section heading, centred between two thin rules. */

@@ -9,7 +9,6 @@ import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import lombok.RequiredArgsConstructor;
@@ -67,9 +66,11 @@ final class InventoryView
 		List<InventorySlot> slots = setup.getInventory();
 		int size = setup.getInventorySize() > 0 ? setup.getInventorySize() : DEFAULT_SIZE;
 		parent.add(Components.subheading("Inventory"));
-		parent.add(Components.label(Html.wrapCentered(Html.muted(Html.parts(slots.size() + "/" + size + " slots", "supplies " + Format.gp(setup.getTripCost()) + " a trip")),
-			Components.TEXT_WIDTH)));
-		parent.add(Components.label(Html.wrapCentered(slotCounts(slots), Components.TEXT_WIDTH)));
+		Map<String, Color> summary = new LinkedHashMap<>();
+		summary.put(slots.size() + "/" + size + " slots", Html.MUTED);
+		summary.put("supplies " + Format.gp(setup.getTripCost()) + " a trip", Html.MUTED);
+		parent.add(Components.centeredPhrases(summary));
+		parent.add(Components.centeredPhrases(slotCounts(slots)));
 		parent.add(Components.spaced(grid(slots, size, setup.getRunePouch(), icons), 6));
 
 		if (setup.getFoodCut() > 0)
@@ -85,13 +86,13 @@ final class InventoryView
 	}
 
 	/** How many slots each kind of item takes, coloured like the slot borders. */
-	private static String slotCounts(List<InventorySlot> slots)
+	private static Map<String, Color> slotCounts(List<InventorySlot> slots)
 	{
 		Map<Kind, Integer> counts = new EnumMap<>(Kind.class);
 		slots.forEach(slot -> counts.merge(Kind.of(slot.getKind()), 1, Integer::sum));
-		return counts.entrySet().stream()
-			.map(e -> Html.color(e.getKey().color, Html.keep(e.getValue() + " " + (e.getValue() == 1 ? e.getKey().singular : e.getKey().plural))))
-			.collect(Collectors.joining(" · "));
+		Map<String, Color> phrases = new LinkedHashMap<>();
+		counts.forEach((kind, count) -> phrases.put(count + " " + (count == 1 ? kind.singular : kind.plural), kind.color));
+		return phrases;
 	}
 
 	private static JPanel grid(List<InventorySlot> slots, int size, List<RunePouchEntry> runePouch, IconLoader icons)
