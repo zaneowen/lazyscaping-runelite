@@ -238,6 +238,15 @@ final class Components
 			public void setText(String text)
 			{
 				super.setText(text == null || text.isEmpty() || text.startsWith("<html>") ? text : Html.wrap(text, width));
+				// centred text sits in the middle of the width it's given, not just within its own box
+				setHorizontalAlignment(text != null && text.contains(Html.CENTERED) ? SwingConstants.CENTER : SwingConstants.LEADING);
+			}
+
+			@Override
+			public Dimension getMaximumSize()
+			{
+				// so a column can stretch it to its full width, which centred text needs
+				return new Dimension(Integer.MAX_VALUE, getPreferredSize().height);
 			}
 		};
 		label.setFont(FontManager.getRunescapeSmallFont());

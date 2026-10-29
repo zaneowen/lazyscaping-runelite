@@ -60,10 +60,13 @@ final class Html
 		return "<u>" + html + "</u>";
 	}
 
+	/** Marks text from {@link #wrapCentered}, so labels can centre themselves too. */
+	static final String CENTERED = "text-align:center";
+
 	/** Wraps text to a width in CSS pixels, centring each line. */
 	static String wrapCentered(String html, int width)
 	{
-		return "<html><body style='width:" + width + "px;text-align:center'>" + html + "</body></html>";
+		return "<html><body style='width:" + width + "px;" + CENTERED + "'>" + html + "</body></html>";
 	}
 
 	/** Wraps text to a width in CSS pixels. */

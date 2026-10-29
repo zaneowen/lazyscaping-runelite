@@ -141,7 +141,7 @@ class GearSetupView
 
 	void showBankMessage(String message)
 	{
-		bankMessage.setText(message == null ? "" : "<html><body style='width:" + Components.TEXT_WIDTH + "px;text-align:center'>" + Html.muted(Html.escape(message)) + "</body></html>");
+		bankMessage.setText(message == null ? "" : Html.wrapCentered(Html.muted(Html.escape(message)), Components.TEXT_WIDTH));
 		bankMessage.setVisible(message != null);
 	}
 
