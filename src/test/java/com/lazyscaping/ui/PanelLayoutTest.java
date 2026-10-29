@@ -44,6 +44,16 @@ public class PanelLayoutTest
 	}
 
 	@Test
+	public void summarisesTheStatChangesThatMatterForTheStyle()
+	{
+		List<Double> change = List.of(0.0, 0.0, 0.0, -2.0, 12.0, 5.0, 5.0, 5.0, 5.0, 0.0, 0.0, 3.0, 0.0, 1.0);
+		// ranged: range attack and ranged strength matter, magic doesn't
+		String text = StatsView.changes(change, List.of(4, 11)).replaceAll("<[^>]+>", "").replace("&nbsp;", " ");
+		assertEquals("+12 Range · +4 Def · +3 R.str · +1 Prayer", text);
+		assertEquals("", StatsView.changes(List.of(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0), List.of(4, 11)));
+	}
+
+	@Test
 	public void linksItemsToTheirWikiPage()
 	{
 		assertEquals("https://oldschool.runescape.wiki/w/Dizana%27s_quiver", Components.wikiUrl("Dizana's quiver"));

@@ -3,6 +3,8 @@ package com.lazyscaping.ui;
 import com.lazyscaping.api.GearSetup;
 import java.awt.Color;
 import java.awt.GridLayout;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -26,6 +28,9 @@ final class StatsView
 	private static final int DEFENCE = 5;
 	private static final int OTHER_START = 10;
 	private static final int MAGIC_DAMAGE = 12;
+	private static final int PRAYER = 13;
+	/** Short names of the bonuses for a change summary, in the site's order. Defences show as one average. */
+	private static final String[] SHORT_NAMES = {"Stab", "Slash", "Crush", "Magic", "Range", null, null, null, null, null, "Str", "R.str", "M.dmg", "Prayer"};
 	/** What each bonus does, in the site's order. */
 	private static final String[] MEANINGS = {
 		"Stab attack: how often stab attacks hit",
@@ -83,6 +88,46 @@ final class StatsView
 		group.add(Components.spaced(Components.label(Html.muted(title)), 6));
 		group.add(Components.spaced(Components.fullWidth(grid), 1));
 		return group;
+	}
+
+	/**
+	 * How a piece of gear changes the bonuses that matter for the style, like
+	 * "+12 Range · +4 Def · +3 R.str": the style's {@code key} bonuses, defence
+	 * and prayer, with gains in green and losses in red. The five defences show
+	 * as their average change, "Def". Empty when none of them change.
+	 */
+	static String changes(List<Double> change, Collection<Integer> key)
+	{
+		if (change.size() < OTHER_START + OTHER.length)
+		{
+			return "";
+		}
+		List<String> parts = new ArrayList<>();
+		for (int i = 0; i < change.size(); i++)
+		{
+			if (i == DEFENCE)
+			{
+				double total = 0;
+				for (int d = DEFENCE; d < OTHER_START; d++)
+				{
+					total += change.get(d);
+				}
+				addChange(parts, Math.round(total / (OTHER_START - DEFENCE)), "", "Def");
+			}
+			else if (SHORT_NAMES[i] != null && (key.contains(i) || i == PRAYER))
+			{
+				addChange(parts, change.get(i), i == MAGIC_DAMAGE ? "%" : "", SHORT_NAMES[i]);
+			}
+		}
+		return String.join(" · ", parts);
+	}
+
+	private static void addChange(List<String> parts, double value, String unit, String name)
+	{
+		if (value != 0)
+		{
+			parts.add(Html.color(value > 0 ? Html.GREEN : Html.RED, Html.keep(signed(value) + unit + " " + name)));
+		}
 	}
 
 	/** A bonus with its sign, and a decimal only when it has one, like "+8.2" or "-35". */

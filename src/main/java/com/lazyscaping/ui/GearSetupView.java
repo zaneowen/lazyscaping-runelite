@@ -327,6 +327,11 @@ class GearSetupView
 				html.append("<br>").append(Html.muted(Format.gp(upgrade.getPrice())));
 			}
 			html.append("<br>").append(gainText(upgrade));
+			String changes = StatsView.changes(upgrade.getStats(), setup.getKeyStats());
+			if (!changes.isEmpty())
+			{
+				html.append("<br>").append(changes);
+			}
 
 			JComponent link = trying.contains(upgrade.getId()) ? null
 				: Components.textButton("Try upgrade", () -> actions.tryUpgrade(target, upgrade.getId()));

@@ -1,5 +1,7 @@
 package com.lazyscaping.api;
 
+import java.util.Collections;
+import java.util.List;
 import lombok.Getter;
 
 /** An upgrade worth buying for a setup, with what it adds. */
@@ -12,4 +14,6 @@ public class UpgradeOption extends GearItem
 	private int gearGain;
 	/** Extra gp an hour, or null when the boss has no money making guide. */
 	private Long gpPerHour;
+	/** The change in each equipment bonus over what it replaces, in the order of {@link GearSetup#getStats()}. */
+	private List<Double> stats = Collections.emptyList();
 }
