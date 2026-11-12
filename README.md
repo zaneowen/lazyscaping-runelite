@@ -19,12 +19,13 @@ The side panel has three tabs.
 - **Training methods.** Every method for the skill, with what it needs. Click one for its details and guide, and *Use this method* to plan around it.
 
 **Bossing**
-- **Gear setup.** Pick a boss, by name or narrowed to a type like *Slayer bosses* or *Raids*, to see the best setup from the gear you own: each worn slot's item with its picture, what to get next and its GE price, the packed inventory with switches, the special attack weapon and supplies, and how to get there. With a budget, it also buys the best upgrades you can afford (not for ironmen).
+- **Gear setup.** Pick a boss, by name or narrowed to a type like *Slayer bosses* or *Raids*, to see the best setup from the gear you own: each worn slot's item with its picture, what to get next and its GE price, the packed inventory with switches, the special attack weapon and supplies, and how to get there. With a budget, it also buys the best upgrades you can afford. Ironmen see how to get each next item instead of its price: where it drops and how often, like *Nex (1/172)*, or how it's made.
 - **Solo or group.** Bosses with solo and group builds, like the raids, Nex and the God Wars generals, have a *Team* picker. The choice is saved per boss.
 - **Equipment stats.** The worn gear's total bonuses, laid out like the in-game equipment stats screen, with the ones that matter for your style in gold.
 - **Try upgrades.** Click *Try upgrade* under any slot to see the setup as if you had the next item, switches and inventory included. *Undo* drops one, and *Back to my gear* drops them all. The overview shows what they add in kills and gp an hour.
 - **Pace and profit.** For bosses with a wiki money making guide, the overview estimates your kills and gp an hour at the pace your gear and levels allow. Once you start killing the boss, a *You* row shows your real kills an hour this session, from your kill count messages, and the gp an hour at your pace.
 - **Best upgrades.** The upgrades that do the most for their price, one per slot, with the gp an hour each adds and how it changes the stats that matter for your style.
+- **Rare drops.** Click *Rare drops* for the boss's most valuable drops and its pet, each with its chance a kill, its chance an hour at your pace (your real one once you're killing it) and how long one takes on average.
 - **Fight tips.** Click *Fight tips* for the fight's tips, which spellbook to be on and whether to use thralls. The *Style* picker marks the style your gear suits best.
 - **Easy to scan.** Each section folds away by clicking its heading, and stays how you left it. Click any item's picture for its wiki page, and hover a stat for what it does.
 
@@ -32,7 +33,7 @@ The side panel has three tabs.
 - **Your task.** The task from RuneLite's Slayer plugin, with kills left, is picked automatically; you can also pick any task. It shows the requirements, where to kill them and tips.
 - **Gear for the task.** The same gear setup as the Bossing tab, planned for the task. *Plan with my Slayer helmet (i)* is ticked when you own one (any colour), and you can tick it yourself if yours is somewhere the plugin can't see.
 
-**Show setup in bank.** Every gear setup can open a temporary *lazyscaping* bank tag with its items, laid out with the worn gear on top and the inventory as it's packed. If your bank is closed, it opens next time you open it. *Copy for Inventory Setups* copies the setup to paste into the [Inventory Setups](https://runelite.net/plugin-hub/show/inventory-setups) plugin's *Import setup*, gear, inventory, rune pouch and bank layout included.
+**Show setup in bank.** Every gear setup can open a temporary *lazyscaping* bank tag with its items, laid out with the worn gear on top and the inventory as it's packed. If your bank is closed, it opens next time you open it. *Copy for Inventory Setups* copies the setup to paste into the [Inventory Setups](https://runelite.net/plugin-hub/show/inventory-setups) plugin's *Import setup*, gear, inventory, rune pouch and bank layout included. *Copy a link to share* copies a link to the setup on lazyscaping.app, with its style, your gear and your levels, to send to a friend or clan.
 
 **Show the way.** With the [Shortest Path](https://runelite.net/plugin-hub/show/shortest-path) plugin on, a boss's *Getting there* section has *Show the way on the map*, which draws the route there.
 

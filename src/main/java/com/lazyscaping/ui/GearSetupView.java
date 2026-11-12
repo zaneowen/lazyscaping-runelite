@@ -8,6 +8,7 @@ import com.lazyscaping.api.Dps;
 import com.lazyscaping.api.FightNotes;
 import com.lazyscaping.api.GearSwitch;
 import com.lazyscaping.api.Profit;
+import com.lazyscaping.api.RareDrop;
 import com.lazyscaping.api.TeamOptions;
 import com.lazyscaping.api.UpgradeOption;
 import java.awt.Component;
@@ -209,6 +210,10 @@ class GearSetupView
 		{
 			setupPanel.add(fightTips(setup.getNotes()));
 		}
+		if (target == GearTarget.BOSS && !setup.getRareDrops().isEmpty())
+		{
+			setupPanel.add(rareDrops(setup));
+		}
 
 		if (setup.getNoGear() == null)
 		{
@@ -406,6 +411,56 @@ class GearSetupView
 			details.add(entry);
 		}
 		return Components.disclosure("Fight tips", details);
+	}
+
+	/**
+	 * The boss's rare drops and pet, each with its chance a kill and, at the
+	 * player's pace (their real one this session when known), an hour.
+	 */
+	private JComponent rareDrops(GearSetup setup)
+	{
+		KillPace pace = paces.get(setup.getBoss().getId());
+		double kph = pace != null && pace.getKph() > 0 ? pace.getKph() : setup.getProfit() != null ? setup.getProfit().getKph() : 0;
+		JPanel details = Components.column();
+		details.add(Components.gap(2));
+		for (RareDrop drop : setup.getRareDrops())
+		{
+			String odds = Html.keep(drop.getRarity() + " a kill");
+			if (kph > 0 && drop.getChance() > 0)
+			{
+				double hourly = 1 - Math.pow(1 - drop.getChance(), kph);
+				odds += Components.PHRASE_SEPARATOR + Html.keep(percent(hourly) + " an hour")
+					+ "<br>" + Html.keep("about " + hoursText(1 / (drop.getChance() * kph)) + " on average");
+			}
+			JPanel entry = Components.entry();
+			entry.add(Components.label(Html.escape(drop.getName()) + "<br>" + Html.muted(odds), Components.ENTRY_WIDTH));
+			details.add(entry);
+		}
+		JComponent disclosure = Components.disclosure("Rare drops", details);
+		disclosure.setToolTipText(kph > 0 ? String.format(Locale.ROOT, "Chances at %.1f kills an hour", kph) : null);
+		return disclosure;
+	}
+
+	/** A length of time in hours, like "40 minutes", "12 hours" or "1,250 hours". */
+	private static String hoursText(double hours)
+	{
+		if (hours < 1)
+		{
+			return Math.max(1, Math.round(hours * 60)) + " minutes";
+		}
+		long whole = Math.round(hours);
+		return String.format(Locale.ROOT, "%,d %s", whole, whole == 1 ? "hour" : "hours");
+	}
+
+	/** A chance as a percentage, with more places when it's small. */
+	private static String percent(double chance)
+	{
+		double pct = chance * 100;
+		if (pct < 0.1)
+		{
+			return "under 0.1%";
+		}
+		return String.format(Locale.ROOT, pct < 10 ? "%.1f%%" : "%.0f%%", pct);
 	}
 
 	/** The upgrades that do the most for their price, each with what it adds and a link to try it. */

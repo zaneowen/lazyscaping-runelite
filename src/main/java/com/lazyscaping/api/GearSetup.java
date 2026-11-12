@@ -25,6 +25,8 @@ public class GearSetup
 	private Dps dps;
 	/** The upgrades that do the most for their price, one per slot. */
 	private List<UpgradeOption> upgrades = Collections.emptyList();
+	/** The boss's rare drops and its pet, the most valuable first. */
+	private List<RareDrop> rareDrops = Collections.emptyList();
 	/** Set when no gear can be brought, saying why. */
 	private String noGear;
 	private List<GearSlot> picks = Collections.emptyList();
