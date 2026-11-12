@@ -3,6 +3,7 @@ package com.lazyscaping.ui;
 import com.lazyscaping.Budget;
 import com.lazyscaping.api.GearSetup;
 import com.lazyscaping.api.GearSlot;
+import com.lazyscaping.api.Dps;
 import com.lazyscaping.api.FightNotes;
 import com.lazyscaping.api.GearSwitch;
 import com.lazyscaping.api.Profit;
@@ -243,6 +244,7 @@ class GearSetupView
 			overview.add(Components.fact("Buying", Html.color(Html.GOLD, Html.keep(Format.gp(setup.getGearCost()))) + of));
 		}
 		overview.add(Components.fact("Slots", emptySlotsSummary(setup)));
+		addDps(overview, setup.getDps());
 		addProfit(overview, setup.getProfit());
 		if (setup.isSuppliesOverBudget())
 		{
@@ -252,6 +254,31 @@ class GearSetupView
 		overview.add(Components.fullWidth(bankButton));
 		overview.add(Components.fullWidth(bankMessage));
 		return overview;
+	}
+
+	/** Max hit, accuracy, DPS and kill time against the boss. */
+	private void addDps(JPanel overview, Dps dps)
+	{
+		if (dps == null)
+		{
+			return;
+		}
+		String about = "From the wiki's combat formulas, with the best prayer for your Prayer level and the style's combat potion. "
+			+ "Special attacks and boss mechanics aren't counted.";
+		JComponent damage = Components.fact("Damage", Html.keep("Max " + dps.getMaxHit()) + " · "
+			+ Html.keep(Math.round(dps.getAccuracy() * 100) + "% accuracy"));
+		JComponent speed = Components.fact("DPS", Html.color(Html.GOLD, String.format(Locale.ROOT, "%.2f", dps.getDps())) + " · "
+			+ Html.keep("about " + killTime(dps.getKillSeconds()) + " a kill"));
+		damage.setToolTipText(about);
+		speed.setToolTipText(about);
+		overview.add(damage);
+		overview.add(speed);
+	}
+
+	/** How long a kill takes, like "1m 05s" or "48s". */
+	static String killTime(long seconds)
+	{
+		return seconds >= 60 ? String.format(Locale.ROOT, "%dm %02ds", seconds / 60, seconds % 60) : seconds + "s";
 	}
 
 	/** Kills and gp an hour from the boss's money making guide, and what tried upgrades add. */
@@ -340,13 +367,24 @@ class GearSetupView
 		return list.getComponentCount() == 0 ? list : Components.disclosure("Best upgrades", list);
 	}
 
+	/** What an upgrade adds: gp an hour when the boss has a money making guide, and DPS when it's one monster. */
 	private static String gainText(UpgradeOption upgrade)
 	{
-		if (upgrade.getGpPerHour() == null)
+		List<String> parts = new ArrayList<>();
+		if (upgrade.getGpPerHour() != null)
 		{
-			return Html.color(Html.GREEN, Html.keep("+" + upgrade.getGearGain() + "% closer to the best"));
+			parts.add(Html.color(Html.GREEN, Html.keep("+" + Format.gp(upgrade.getGpPerHour()) + "/hr")));
 		}
-		return Html.color(Html.GREEN, Html.keep("+" + Format.gp(upgrade.getGpPerHour()) + "/hr"));
+		Integer dps = upgrade.getDpsGain();
+		if (dps != null && dps != 0)
+		{
+			parts.add(Html.color(dps > 0 ? Html.GREEN : Html.RED, Html.keep(String.format(Locale.ROOT, "%+d%% DPS", dps))));
+		}
+		if (parts.isEmpty())
+		{
+			parts.add(Html.color(Html.GREEN, Html.keep("+" + upgrade.getGearGain() + "% closer to the best")));
+		}
+		return String.join(" · ", parts);
 	}
 
 	/** Where the gear comes from. */

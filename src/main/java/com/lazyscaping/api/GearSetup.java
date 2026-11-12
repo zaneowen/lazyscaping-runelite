@@ -21,6 +21,8 @@ public class GearSetup
 	private FightNotes notes;
 	/** Null when the boss has no money making guide. */
 	private Profit profit;
+	/** Null when the fight isn't one monster. */
+	private Dps dps;
 	/** The upgrades that do the most for their price, one per slot. */
 	private List<UpgradeOption> upgrades = Collections.emptyList();
 	/** Set when no gear can be brought, saying why. */

@@ -16,4 +16,6 @@ public class UpgradeOption extends GearItem
 	private Long gpPerHour;
 	/** The change in each equipment bonus over what it replaces, in the order of {@link GearSetup#getStats()}. */
 	private List<Double> stats = Collections.emptyList();
+	/** The change in DPS, in percent, or null when the fight isn't one monster. */
+	private Integer dpsGain;
 }
