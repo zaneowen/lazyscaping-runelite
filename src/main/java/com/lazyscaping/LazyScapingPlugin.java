@@ -9,6 +9,11 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 import com.google.inject.Provides;
 import com.lazyscaping.api.GearSetup;
+import com.lazyscaping.api.Material;
+import com.lazyscaping.api.Materials;
+import com.lazyscaping.api.Plan;
+import com.lazyscaping.api.TrainingMethod;
+import com.lazyscaping.ui.BankedXp;
 import com.lazyscaping.api.LazyScapingClient;
 import com.lazyscaping.api.SlayerTaskRef;
 import com.lazyscaping.ui.GearTarget;
@@ -18,6 +23,7 @@ import com.lazyscaping.ui.PanelActions;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.function.Consumer;
 import java.util.Map;
 import java.util.Objects;
@@ -841,7 +847,55 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 		}
 
 		updatePanel(p -> p.showPlanMessage("Loading your plan..."));
-		api.plan(body, plan -> updatePanel(p -> p.showPlan(plan)), error -> updatePanel(p -> p.showPlanError(error)));
+		Skill skill = goalSkill;
+		api.plan(body, plan -> clientThread.invoke(() ->
+		{
+			BankedXp banked = bankedXp(plan, skill);
+			updatePanel(p -> p.showPlan(plan, banked));
+		}), error -> updatePanel(p -> p.showPlanError(error)));
+	}
+
+	/**
+	 * The xp the materials in the player's bank and inventory are worth for each
+	 * of a plan's methods: as many actions as the scarcest material allows.
+	 * Worked out here, so the bank never leaves the player's computer.
+	 */
+	private BankedXp bankedXp(Plan plan, Skill skill)
+	{
+		Map<String, Long> byMethod = new HashMap<>();
+		String bestMethod = null;
+		long bestXp = 0;
+		for (TrainingMethod method : plan.getOptions())
+		{
+			Materials materials = method.getMaterials();
+			if (materials == null || materials.getXp() <= 0 || materials.getInputs().isEmpty())
+			{
+				continue;
+			}
+			long actions = Long.MAX_VALUE;
+			for (Material input : materials.getInputs())
+			{
+				if (input.getItemId() == null || input.getQty() <= 0)
+				{
+					actions = 0;
+					break;
+				}
+				actions = Math.min(actions, ownedItems.quantity(input.getItemId()) / input.getQty());
+			}
+			long xp = (long) (actions * materials.getXp());
+			if (xp > 0)
+			{
+				byMethod.put(method.getId(), xp);
+				if (xp > bestXp)
+				{
+					bestXp = xp;
+					bestMethod = method.getId();
+				}
+			}
+		}
+		int currentXp = account.xp(skill);
+		int toXp = (int) Math.min(Experience.MAX_SKILL_XP, currentXp + bestXp);
+		return new BankedXp(byMethod, bestMethod, bestXp, Experience.getLevelForXp(currentXp), Experience.getLevelForXp(toXp));
 	}
 
 	/** What to do next across the account, from the player's levels, gear and quests. */

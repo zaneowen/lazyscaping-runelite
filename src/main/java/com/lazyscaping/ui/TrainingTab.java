@@ -38,6 +38,8 @@ class TrainingTab extends JPanel
 	private final BudgetPicker budget;
 	private final JPanel planList = Components.column();
 	private final JPanel methodList = Components.column();
+	/** The xp the player's materials are worth for the shown plan's methods, or null. */
+	private BankedXp banked;
 
 	private Skill skill;
 	private boolean updating;
@@ -167,8 +169,10 @@ class TrainingTab extends JPanel
 		Components.showMessage(methodList, null);
 	}
 
-	void showPlan(Plan plan)
+	/** Shows a plan, with the xp the player's materials are worth for its methods, if known. */
+	void showPlan(Plan plan, BankedXp banked)
 	{
+		this.banked = banked;
 		planList.removeAll();
 		if (plan.isGoalReached() || plan.getSteps().isEmpty())
 		{
@@ -177,6 +181,7 @@ class TrainingTab extends JPanel
 		else
 		{
 			planList.add(Components.label(Html.wrapCentered(Html.parts("About " + Format.hours(plan.getTotalHours()), Format.cost(plan.getTotalCost())), Components.TEXT_WIDTH)));
+			addBankedXp(plan);
 			if (plan.isOverBudget())
 			{
 				planList.add(Components.label(Html.color(Html.RED, "Over your budget, so this uses the cheapest methods.")));
@@ -190,6 +195,22 @@ class TrainingTab extends JPanel
 		}
 		showMethods(plan);
 		Components.refresh(planList);
+	}
+
+	/** The xp the best method's materials in the player's bank are worth, and the levels that takes them through. */
+	private void addBankedXp(Plan plan)
+	{
+		if (banked == null || banked.getBestXp() <= 0)
+		{
+			return;
+		}
+		TrainingMethod best = plan.option(banked.getBestMethod());
+		String method = best != null ? best.getName() : "your materials";
+		String levels = banked.getToLevel() > banked.getFromLevel() ? " " + Html.keep("(" + banked.getFromLevel() + " → " + banked.getToLevel() + ")") : "";
+		JComponent row = Components.fact("Banked", Html.color(Html.GREEN, Html.keep(Format.number(banked.getBestXp()) + " xp")) + levels
+			+ "<br>" + Html.muted(Html.escape(method)));
+		row.setToolTipText("The xp the materials in your bank and inventory are worth for one method");
+		planList.add(Components.spaced(row, 4));
 	}
 
 	private JComponent stepRow(PlanStep step, TrainingMethod method)
@@ -251,6 +272,11 @@ class TrainingTab extends JPanel
 		else if (!method.isAvailable())
 		{
 			text.append("<br>").append(Html.muted("From level " + method.getLevel()));
+		}
+		long xpBanked = banked == null ? 0 : banked.getByMethod().getOrDefault(method.getId(), 0L);
+		if (xpBanked > 0)
+		{
+			text.append("<br>").append(Html.color(Html.GREEN, Html.keep("Banked: " + Format.number(xpBanked) + " xp")));
 		}
 
 		JButton button = picked ? pickButton("Back to the best plan", null, MethodDetails.WIDTH)

@@ -206,9 +206,10 @@ public class LazyScapingPanel extends PluginPanel
 		nextSteps.show(steps);
 	}
 
-	public void showPlan(Plan plan)
+	/** Shows a training plan, with the xp the player's materials are worth for its methods, or null if unknown. */
+	public void showPlan(Plan plan, BankedXp banked)
 	{
-		training.showPlan(plan);
+		training.showPlan(plan, banked);
 	}
 
 	public void showPlanMessage(String message)

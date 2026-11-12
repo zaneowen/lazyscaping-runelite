@@ -4,6 +4,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
@@ -17,7 +18,7 @@ import net.runelite.client.game.ItemManager;
 import net.runelite.client.game.ItemVariationMapping;
 
 /**
- * Tracks the gear and coins the player owns. The bank is only available while
+ * Tracks the gear, coins and item quantities the player owns. The bank is only available while
  * it's open, so its contents are saved to the profile. Used on the client thread,
  * except {@link #itemId}.
  */
@@ -30,7 +31,8 @@ class OwnedItems
 	private final ItemManager itemManager;
 	private final ProfileSettings settings;
 
-	private Set<Integer> bankItemIds = Collections.emptySet();
+	/** How many of each item the bank holds, by canonical item id, as last seen. */
+	private Map<Integer, Long> bankQuantities = Collections.emptyMap();
 	private long bankCoins;
 	/** Gear in the bank, by gear id, matched when the bank changes rather than on every inventory change. */
 	private Map<String, Integer> bankGear;
@@ -46,18 +48,20 @@ class OwnedItems
 		this.settings = settings;
 	}
 
-	/** Loads the bank saved for the current profile. */
+	/** Loads the bank saved for the current profile, as "id:quantity" entries. */
 	void load()
 	{
-		Set<Integer> ids = new TreeSet<>();
+		Map<Integer, Long> quantities = new TreeMap<>();
 		String saved = settings.get(ProfileSettings.BANK_ITEMS);
 		if (saved != null && !saved.isEmpty())
 		{
-			for (String id : saved.split(","))
+			for (String entry : saved.split(","))
 			{
+				// banks saved before quantities were kept have only the id
+				String[] parts = entry.split(":", 2);
 				try
 				{
-					ids.add(Integer.parseInt(id));
+					quantities.put(Integer.parseInt(parts[0]), parts.length > 1 ? Long.parseLong(parts[1]) : 1L);
 				}
 				catch (NumberFormatException ignored)
 				{
@@ -65,30 +69,53 @@ class OwnedItems
 				}
 			}
 		}
-		bankItemIds = ids;
+		bankQuantities = quantities;
 		bankCoins = settings.getLong(ProfileSettings.BANK_COINS, 0);
 		bankGear = null;
 	}
 
 	void onBankChanged(ItemContainer bank)
 	{
-		Set<Integer> ids = new TreeSet<>();
+		Map<Integer, Long> quantities = new TreeMap<>();
 		for (Item item : bank.getItems())
 		{
 			if (item.getId() > 0)
 			{
-				ids.add(itemManager.canonicalize(item.getId()));
+				quantities.merge(itemManager.canonicalize(item.getId()), (long) item.getQuantity(), Long::sum);
 			}
 		}
 
-		if (!ids.equals(bankItemIds))
+		if (!quantities.equals(bankQuantities))
 		{
-			bankItemIds = ids;
-			bankGear = null;
-			settings.set(ProfileSettings.BANK_ITEMS, ids.stream().map(String::valueOf).collect(Collectors.joining(",")));
+			if (!quantities.keySet().equals(bankQuantities.keySet()))
+			{
+				bankGear = null;
+			}
+			bankQuantities = quantities;
+			settings.set(ProfileSettings.BANK_ITEMS, quantities.entrySet().stream()
+				.map(e -> e.getKey() + ":" + e.getValue())
+				.collect(Collectors.joining(",")));
 		}
 		bankCoins = coinsIn(bank);
 		settings.set(ProfileSettings.BANK_COINS, bankCoins);
+	}
+
+	/** How many of an item the player has in their bank (as last seen) and inventory. */
+	long quantity(int itemId)
+	{
+		long carried = 0;
+		ItemContainer inventory = client.getItemContainer(InventoryID.INV);
+		if (inventory != null)
+		{
+			for (Item item : inventory.getItems())
+			{
+				if (item.getId() > 0 && itemManager.canonicalize(item.getId()) == itemId)
+				{
+					carried += item.getQuantity();
+				}
+			}
+		}
+		return bankQuantities.getOrDefault(itemId, 0L) + carried;
 	}
 
 	/** Coins and platinum tokens in the bank (as last seen) and inventory. */
@@ -102,7 +129,7 @@ class OwnedItems
 	{
 		if (bankGear == null || bankGearCatalog != catalog)
 		{
-			bankGear = matchGear(bankItemIds, catalog);
+			bankGear = matchGear(bankQuantities.keySet(), catalog);
 			bankGearCatalog = catalog;
 		}
 

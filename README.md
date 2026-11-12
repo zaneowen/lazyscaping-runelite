@@ -15,7 +15,7 @@ The side panel has three tabs.
 **Training**
 - **What to do next.** The top of the Training tab suggests your next steps across the account: bosses you're ready for, levels that get you to bosses you're close to, untradeable gear worth earning and quests that open faster training. Click a boss to open it in the Bossing tab, or a level to set it as your goal.
 - **Training goal.** Pick a skill and a target level. The panel shows your progress since you set the goal, xp left, and, while you're training, your xp/hr and how long the goal will take (from RuneLite's XP Tracker).
-- **Your plan.** The LazyScaping plan for your goal: which method to use at each level, with xp/hr, hours and cost, following your *Plan priority* setting and your budget. Click a step for the method's guide and materials.
+- **Your plan.** The LazyScaping plan for your goal: which method to use at each level, with xp/hr, hours and cost, following your *Plan priority* setting and your budget. Click a step for the method's guide and materials. It also shows your banked xp: what the materials in your bank and inventory are worth for each method, worked out on your computer.
 - **Training methods.** Every method for the skill, with what it needs. Click one for its details and guide, and *Use this method* to plan around it.
 
 **Bossing**
