@@ -41,6 +41,9 @@ public interface PanelActions
 	/** Shows a setup's items as a bank tag. */
 	void showInBank(GearTarget target);
 
+	/** Copies a setup in the form the Inventory Setups plugin imports. */
+	void copyForInventorySetups(GearTarget target);
+
 	/** Opens the site with the player's data filled in. */
 	void openPlanner();
 

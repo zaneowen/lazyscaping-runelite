@@ -32,7 +32,7 @@ The side panel has three tabs.
 - **Your task.** The task from RuneLite's Slayer plugin, with kills left, is picked automatically; you can also pick any task. It shows the requirements, where to kill them and tips.
 - **Gear for the task.** The same gear setup as the Bossing tab, planned for the task. *Plan with my Slayer helmet (i)* is ticked when you own one (any colour), and you can tick it yourself if yours is somewhere the plugin can't see.
 
-**Show setup in bank.** Every gear setup can open a temporary *lazyscaping* bank tag with its items, laid out with the worn gear on top and the inventory as it's packed. If your bank is closed, it opens next time you open it.
+**Show setup in bank.** Every gear setup can open a temporary *lazyscaping* bank tag with its items, laid out with the worn gear on top and the inventory as it's packed. If your bank is closed, it opens next time you open it. *Copy for Inventory Setups* copies the setup to paste into the [Inventory Setups](https://runelite.net/plugin-hub/show/inventory-setups) plugin's *Import setup*, gear, inventory, rune pouch and bank layout included.
 
 **Show the way.** With the [Shortest Path](https://runelite.net/plugin-hub/show/shortest-path) plugin on, a boss's *Getting there* section has *Show the way on the map*, which draws the route there.
 

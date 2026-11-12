@@ -69,10 +69,36 @@ class BankTagLoader
 	 */
 	boolean show(GearSetup setup)
 	{
-		int[] layout = new int[INVENTORY_START + INVENTORY_ROWS * BANK_COLUMNS];
-		Arrays.fill(layout, -1);
 		Set<Integer> itemIds = new HashSet<>();
 		Set<String> names = new HashSet<>();
+		int[] layout = layout(setup, itemIds, names);
+
+		// other versions of the items are tagged too, like a ring of dueling with fewer charges
+		Set<Integer> baseIds = itemIds.stream().map(ItemVariationMapping::map).collect(Collectors.toSet());
+		tagManager.registerTag(TAG, itemId -> itemIds.contains(itemId) || baseIds.contains(ItemVariationMapping.map(itemId))
+			|| names.contains(anyDoseName(itemId)));
+		layoutManager.saveLayout(new Layout(TAG, layout));
+
+		if (!isBankOpen())
+		{
+			pending = true;
+			return false;
+		}
+		open();
+		return true;
+	}
+
+	/** The bank layout for a setup: the worn gear on top, then the inventory as it's packed and the rune pouch's runes beside it. */
+	int[] layout(GearSetup setup)
+	{
+		return layout(setup, new HashSet<>(), new HashSet<>());
+	}
+
+	/** Lays a setup out, collecting the item ids and potion names it uses. */
+	private int[] layout(GearSetup setup, Set<Integer> itemIds, Set<String> names)
+	{
+		int[] layout = new int[INVENTORY_START + INVENTORY_ROWS * BANK_COLUMNS];
+		Arrays.fill(layout, -1);
 
 		int position = 0;
 		for (GearSlot slot : setup.getPicks())
@@ -100,19 +126,7 @@ class BankTagLoader
 			}
 		}
 
-		// other versions of the items are tagged too, like a ring of dueling with fewer charges
-		Set<Integer> baseIds = itemIds.stream().map(ItemVariationMapping::map).collect(Collectors.toSet());
-		tagManager.registerTag(TAG, itemId -> itemIds.contains(itemId) || baseIds.contains(ItemVariationMapping.map(itemId))
-			|| names.contains(anyDoseName(itemId)));
-		layoutManager.saveLayout(new Layout(TAG, layout));
-
-		if (!isBankOpen())
-		{
-			pending = true;
-			return false;
-		}
-		open();
-		return true;
+		return layout;
 	}
 
 	/** Opens a tag that was waiting for the bank. */

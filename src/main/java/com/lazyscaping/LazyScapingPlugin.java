@@ -20,6 +20,8 @@ import com.lazyscaping.ui.GearTarget;
 import com.lazyscaping.ui.GoalProgress;
 import com.lazyscaping.ui.LazyScapingPanel;
 import com.lazyscaping.ui.PanelActions;
+import java.awt.Toolkit;
+import java.awt.datatransfer.StringSelection;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.EnumMap;
@@ -128,6 +130,9 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 
 	@Inject
 	private BankTagLoader bankTagLoader;
+
+	@Inject
+	private SetupExporter setupExporter;
 
 	@Inject
 	private HouseReader houseReader;
@@ -615,6 +620,29 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 				saveIfLoggedIn(ProfileSettings.TRAINING_BUDGET, budget);
 				fetchPlan();
 			}
+		});
+	}
+
+	@Override
+	public void copyForInventorySetups(GearTarget target)
+	{
+		clientThread.invoke(() ->
+		{
+			GearSetup setup = gearPlans.get(target).setup;
+			if (setup == null)
+			{
+				return;
+			}
+			String what = setup.getTask() != null ? setup.getTask().getName() : setup.getBoss().getName();
+			String text = setupExporter.export(setup, "LazyScaping: " + what + " (" + setup.getStyle() + ")");
+			SwingUtilities.invokeLater(() ->
+			{
+				Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(text), null);
+				if (panel != null)
+				{
+					panel.showBankMessage(target, "Copied. In Inventory Setups, choose Import setup and paste it.");
+				}
+			});
 		});
 	}
 

@@ -260,6 +260,9 @@ class GearSetupView
 		}
 		overview.add(Components.gap(8));
 		overview.add(Components.fullWidth(bankButton));
+		JLabel copy = Components.textButton("Copy for Inventory Setups", () -> actions.copyForInventorySetups(target));
+		copy.setToolTipText("Copies the setup to paste into the Inventory Setups plugin's Import setup");
+		overview.add(Components.spaced(Components.centered(copy), 4));
 		overview.add(Components.fullWidth(bankMessage));
 		return overview;
 	}
