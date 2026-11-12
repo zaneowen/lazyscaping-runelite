@@ -49,6 +49,9 @@ public interface PanelActions
 
 	void openWiki(String url);
 
+	/** Asks the Shortest Path plugin to show the way to a map location. */
+	void showPath(int x, int y, int plane);
+
 	/** Whether a foldable section of the panel was left open. */
 	boolean isSectionOpen(String name);
 

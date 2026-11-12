@@ -18,6 +18,16 @@ public class Travel
 	private boolean fairyRings;
 	/** The boss's OSRS Wiki strategy page. */
 	private String wiki;
+	/** Where the boss is on the map, when a path can reach it, or null. */
+	private Location location;
+
+	@Getter
+	public static class Location
+	{
+		private int x;
+		private int y;
+		private int plane;
+	}
 
 	public boolean isEmpty()
 	{

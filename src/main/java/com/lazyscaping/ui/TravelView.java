@@ -12,7 +12,11 @@ final class TravelView
 	{
 	}
 
-	static void addTo(JPanel parent, Travel travel, PanelActions actions, IconLoader icons)
+	/**
+	 * Adds the travel details. {@code pathAvailable} says the Shortest Path plugin
+	 * is on, so a link can ask it to show the way to the boss.
+	 */
+	static void addTo(JPanel parent, Travel travel, PanelActions actions, IconLoader icons, boolean pathAvailable)
 	{
 		if (travel == null || travel.isEmpty())
 		{
@@ -52,6 +56,13 @@ final class TravelView
 			parent.add(Components.spaced(Components.label(Html.muted(Html.escape(tip))), 4));
 		}
 
+		Travel.Location location = travel.getLocation();
+		if (pathAvailable && location != null)
+		{
+			JLabel path = Components.textButton("Show the way on the map", () -> actions.showPath(location.getX(), location.getY(), location.getPlane()));
+			path.setToolTipText("Draws the shortest path there with the Shortest Path plugin");
+			parent.add(Components.spaced(Components.centered(path), 8));
+		}
 		if (travel.getWiki() != null)
 		{
 			parent.add(Components.spaced(Components.centered(Components.textButton("Strategy guide on the OSRS Wiki", () -> actions.openWiki(travel.getWiki()))), 8));

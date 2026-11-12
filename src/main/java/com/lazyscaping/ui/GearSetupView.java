@@ -48,6 +48,8 @@ class GearSetupView
 	private final JPanel panel = Components.column();
 
 	private boolean updating;
+	/** The Shortest Path plugin is on, so the way to a boss can be shown. */
+	private boolean pathAvailable;
 	/** The style the shown setup's gear suits best, or null. */
 	private String bestStyle;
 	/** Gear ids of the upgrades being tried in the setup shown. */
@@ -115,6 +117,12 @@ class GearSetupView
 	void setBudget(String text)
 	{
 		budget.setBudget(text);
+	}
+
+	/** Whether the Shortest Path plugin is on. Applies from the next setup shown. */
+	void setPathAvailable(boolean available)
+	{
+		pathAvailable = available;
 	}
 
 	void setCoins(long coins)
@@ -204,7 +212,7 @@ class GearSetupView
 		{
 			addSection("Inventory", body -> InventoryView.addTo(body, setup, icons, actions));
 		}
-		addSection("Getting there", body -> TravelView.addTo(body, setup.getTravel(), actions, icons));
+		addSection("Getting there", body -> TravelView.addTo(body, setup.getTravel(), actions, icons, pathAvailable));
 		Components.refresh(setupPanel);
 	}
 

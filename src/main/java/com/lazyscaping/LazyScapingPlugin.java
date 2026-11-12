@@ -43,15 +43,19 @@ import net.runelite.api.GameState;
 import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.gameval.InventoryID;
 import net.runelite.api.Skill;
+import net.runelite.api.coords.WorldPoint;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
+import net.runelite.client.events.PluginChanged;
+import net.runelite.client.events.PluginMessage;
 import net.runelite.client.plugins.banktags.BankTagsPlugin;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDependency;
 import net.runelite.client.plugins.PluginDescriptor;
+import net.runelite.client.plugins.PluginManager;
 import net.runelite.client.plugins.slayer.SlayerPlugin;
 import net.runelite.client.plugins.slayer.SlayerPluginService;
 import net.runelite.client.plugins.xptracker.XpTrackerPlugin;
@@ -80,6 +84,9 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 	private static final int UPDATE_TICKS = 5;
 	private static final String WIKI_HOST = "oldschool.runescape.wiki";
 	private static final String SLAYER_HELMET = "slayer_helmet_i";
+	/** The Shortest Path plugin, which draws the way to a map location for other plugins. */
+	private static final String SHORTEST_PATH = "Shortest Path";
+	private static final String SHORTEST_PATH_NAMESPACE = "shortestpath";
 	/** Settings key for the panel sections the player has folded. Not shown in the settings. */
 	private static final String CLOSED_SECTIONS = "closedSections";
 
@@ -127,6 +134,9 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 
 	@Inject
 	private EventBus eventBus;
+
+	@Inject
+	private PluginManager pluginManager;
 
 	@Inject
 	private Gson gson;
@@ -192,6 +202,8 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 			.build();
 		clientToolbar.addNavigation(navButton);
 		eventBus.register(houseReader);
+		boolean path = isShortestPathOn();
+		updatePanel(p -> p.setPathAvailable(path));
 
 		if (config.liveRecommendations())
 		{
@@ -353,6 +365,32 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 			// the bank's items load after its interface
 			clientThread.invokeLater(bankTagLoader::onBankOpened);
 		}
+	}
+
+	@Subscribe
+	public void onPluginChanged(PluginChanged event)
+	{
+		if (SHORTEST_PATH.equals(event.getPlugin().getName()))
+		{
+			boolean path = isShortestPathOn();
+			updatePanel(p -> p.setPathAvailable(path));
+		}
+	}
+
+	/** Whether the Shortest Path plugin from the Plugin Hub is installed and on. */
+	private boolean isShortestPathOn()
+	{
+		return pluginManager.getPlugins().stream()
+			.anyMatch(p -> SHORTEST_PATH.equals(p.getName()) && pluginManager.isPluginEnabled(p));
+	}
+
+	@Override
+	public void showPath(int x, int y, int plane)
+	{
+		// Shortest Path's cross-plugin message: show a path to the target
+		Map<String, Object> data = new HashMap<>();
+		data.put("target", new WorldPoint(x, y, plane));
+		clientThread.invoke(() -> eventBus.post(new PluginMessage(SHORTEST_PATH_NAMESPACE, "path", data)));
 	}
 
 	@Subscribe

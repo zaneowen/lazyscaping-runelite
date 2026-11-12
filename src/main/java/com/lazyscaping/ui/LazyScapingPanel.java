@@ -163,6 +163,13 @@ public class LazyScapingPanel extends PluginPanel
 		setup(GearTarget.SLAYER).setBudget(budget);
 	}
 
+	/** Whether the Shortest Path plugin is on, so gear setups can link to the way there. */
+	public void setPathAvailable(boolean available)
+	{
+		setup(GearTarget.BOSS).setPathAvailable(available);
+		setup(GearTarget.SLAYER).setPathAvailable(available);
+	}
+
 	public void setCoins(long coins)
 	{
 		training.setCoins(coins);
