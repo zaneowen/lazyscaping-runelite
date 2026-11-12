@@ -50,6 +50,9 @@ public interface PanelActions
 	/** Opens a setup's full plan on the site. */
 	void openGearPlan(GearTarget target);
 
+	/** Copies a link to a setup's full plan on the site, to share with friends. */
+	void copyShareLink(GearTarget target);
+
 	void openWiki(String url);
 
 	/** Asks the Shortest Path plugin to show the way to a map location. */

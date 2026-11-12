@@ -282,6 +282,9 @@ class GearSetupView
 		JLabel copy = Components.textButton("Copy for Inventory Setups", () -> actions.copyForInventorySetups(target));
 		copy.setToolTipText("Copies the setup to paste into the Inventory Setups plugin's Import setup");
 		overview.add(Components.spaced(Components.centered(copy), 4));
+		JLabel share = Components.textButton("Copy a link to share", () -> actions.copyShareLink(target));
+		share.setToolTipText("Copies a link to this setup on lazyscaping.app, with your gear, to send to a friend or clan");
+		overview.add(Components.spaced(Components.centered(share), 2));
 		overview.add(Components.fullWidth(bankMessage));
 		return overview;
 	}

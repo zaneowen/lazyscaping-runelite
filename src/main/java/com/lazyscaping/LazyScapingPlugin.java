@@ -702,32 +702,72 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 	{
 		clientThread.invoke(() ->
 		{
-			String id = gearPlans.get(target).selectedId;
-			if (id == null)
+			String url = gearPlanUrl(target);
+			if (url != null)
+			{
+				LinkBrowser.browse(url);
+			}
+		});
+	}
+
+	@Override
+	public void copyShareLink(GearTarget target)
+	{
+		clientThread.invoke(() ->
+		{
+			String url = gearPlanUrl(target);
+			if (url == null)
 			{
 				return;
 			}
+			SwingUtilities.invokeLater(() ->
+			{
+				Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(url), null);
+				if (panel != null)
+				{
+					panel.showBankMessage(target, "Link copied. It opens this setup, with your gear and levels, on lazyscaping.app.");
+				}
+			});
+		});
+	}
 
-			HttpUrl.Builder url = LazyScapingClient.SITE.newBuilder().addPathSegment("bosses");
+	/**
+	 * A setup's full plan on the site, with the player's name so the page looks
+	 * up their levels, or null before a boss is picked. Used on the client thread.
+	 */
+	private String gearPlanUrl(GearTarget target)
+	{
+		GearPlan plan = gearPlans.get(target);
+		String id = plan.selectedId;
+		if (id == null)
+		{
+			return null;
+		}
+
+		// The shown setup's own link carries its style and the gear owned for it,
+		// once it's loaded for the picked boss or task.
+		String param = target == GearTarget.SLAYER ? "task" : "boss";
+		HttpUrl shared = plan.setup != null && plan.setup.getShare() != null ? HttpUrl.parse(plan.setup.getShare()) : null;
+		boolean usable = shared != null && shared.host().equals(LazyScapingClient.SITE.host()) && id.equals(shared.queryParameter(param));
+		HttpUrl.Builder url = usable ? shared.newBuilder() : LazyScapingClient.SITE.newBuilder().addPathSegment("bosses");
+		if (!usable)
+		{
 			if (target == GearTarget.SLAYER)
 			{
-				url.addQueryParameter("mode", "slayer").addQueryParameter("task", id);
+				url.addQueryParameter("mode", "slayer");
 			}
-			else
+			url.addQueryParameter(param, id);
+		}
+		if (playerName != null)
+		{
+			url.setQueryParameter("player", playerName);
+			String type = account.hiscoresType();
+			if (!"normal".equals(type))
 			{
-				url.addQueryParameter("boss", id);
+				url.setQueryParameter("type", type);
 			}
-			if (playerName != null)
-			{
-				url.addQueryParameter("player", playerName);
-				String type = account.hiscoresType();
-				if (!"normal".equals(type))
-				{
-					url.addQueryParameter("type", type);
-				}
-			}
-			LinkBrowser.browse(url.build().toString());
-		});
+		}
+		return url.build().toString();
 	}
 
 	@Override

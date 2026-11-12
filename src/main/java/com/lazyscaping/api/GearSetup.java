@@ -52,6 +52,8 @@ public class GearSetup
 	/** The budget used, or null for unlimited. */
 	private Long budget;
 	private boolean ironman;
+	/** This setup on the site's Bossing page, with the gear owned for it, or null from an older site. */
+	private String share;
 	/** Gp spent on gear. */
 	private long gearCost;
 	/** Supplies alone cost more than the budget, so no gear was bought. */
