@@ -1,6 +1,7 @@
 package com.lazyscaping.ui;
 
 import com.lazyscaping.Budget;
+import com.lazyscaping.api.GearItem;
 import com.lazyscaping.api.GearSetup;
 import com.lazyscaping.api.GearSlot;
 import com.lazyscaping.api.Dps;
@@ -589,6 +590,19 @@ class GearSetupView
 		return links.isEmpty() ? null : Components.links(links.toArray(new JComponent[0]));
 	}
 
+	/**
+	 * What to know about the next item to get: for ironmen how to get it, like
+	 * where it drops, else its GE price. Null when there's neither.
+	 */
+	private String nextDetail(GearItem next)
+	{
+		if (shown != null && shown.isIronman() && next.getHowToGet() != null)
+		{
+			return Html.escape(next.getHowToGet());
+		}
+		return next.getPrice() != null ? Format.gp(next.getPrice()) : null;
+	}
+
 	/** One equipment slot: the item's picture, then the item and what to get next. */
 	private JComponent slotRow(GearSlot slot)
 	{
@@ -619,9 +633,10 @@ class GearSetupView
 			if (slot.getNext() != null)
 			{
 				html.append("<br>").append(Html.muted("Next: " + Html.escape(slot.getNext().getName())));
-				if (slot.getNext().getPrice() != null)
+				String detail = nextDetail(slot.getNext());
+				if (detail != null)
 				{
-					html.append("<br>").append(Html.muted(Format.gp(slot.getNext().getPrice())));
+					html.append("<br>").append(Html.muted(detail));
 				}
 			}
 			icons.loadItem(slot.getItem(), 1, false, picture);
@@ -631,7 +646,7 @@ class GearSetupView
 		{
 			String label = slot.isMissingRequired() ? "Needed: " : "Get: ";
 			html.append(Html.color(slot.isMissingRequired() ? Html.RED : Html.GOLD, label + Html.escape(slot.getNext().getName())))
-				.append("<br>").append(Html.muted(slot.getNext().getPrice() != null ? Format.gp(slot.getNext().getPrice()) : "Untradeable"));
+				.append("<br>").append(Html.muted(nextDetail(slot.getNext()) != null ? nextDetail(slot.getNext()) : "Untradeable"));
 			icons.loadItem(slot.getNext(), 1, true, picture);
 			Components.linkToWiki(picture, slot.getNext().getName(), actions);
 		}

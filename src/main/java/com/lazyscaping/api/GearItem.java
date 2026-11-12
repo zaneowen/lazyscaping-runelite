@@ -10,4 +10,6 @@ public class GearItem extends ItemRef
 	private String id;
 	/** GE price, or null when untradeable. Ammo is priced for one trip. */
 	private Long price;
+	/** How to get it without the GE, like where it drops and how often, or null. */
+	private String howToGet;
 }
