@@ -11,7 +11,9 @@ import com.lazyscaping.api.TeamOptions;
 import com.lazyscaping.api.UpgradeOption;
 import java.awt.Component;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Locale;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -50,6 +52,12 @@ class GearSetupView
 	private boolean updating;
 	/** The Shortest Path plugin is on, so the way to a boss can be shown. */
 	private boolean pathAvailable;
+	/** The player's pace at each boss this session, by boss id. */
+	private final Map<String, KillPace> paces = new HashMap<>();
+	/** The shown setup, and its row of the player's pace, updated after each kill without redrawing the setup. */
+	private GearSetup shown;
+	private JComponent paceRow;
+	private JLabel paceValue;
 	/** The style the shown setup's gear suits best, or null. */
 	private String bestStyle;
 	/** Gear ids of the upgrades being tried in the setup shown. */
@@ -178,6 +186,8 @@ class GearSetupView
 	void showSetup(GearSetup setup, Set<String> trying)
 	{
 		this.trying = trying;
+		shown = setup;
+		paceRow = null;
 		bestStyle = setup.getBestStyle();
 		updating = true;
 		showTeam(setup.getTeam());
@@ -254,6 +264,14 @@ class GearSetupView
 		overview.add(Components.fact("Slots", emptySlotsSummary(setup)));
 		addDps(overview, setup.getDps());
 		addProfit(overview, setup.getProfit());
+		if (target == GearTarget.BOSS)
+		{
+			paceValue = Components.factValue("");
+			paceRow = Components.fact("You", paceValue);
+			paceRow.setToolTipText("Your real pace from your kill count messages this session");
+			overview.add(paceRow);
+			showPace();
+		}
 		if (setup.isSuppliesOverBudget())
 		{
 			overview.add(Components.spaced(Components.label(Html.color(Html.RED, "Supplies cost more than your budget, so no gear was bought.")), 6));
@@ -318,6 +336,44 @@ class GearSetupView
 		money.setToolTipText(about);
 		overview.add(pace);
 		overview.add(money);
+	}
+
+	/** Records the player's pace at a boss, updating the shown setup if it's for that boss. */
+	void setKillPace(String bossId, KillPace pace)
+	{
+		paces.put(bossId, pace);
+		showPace();
+	}
+
+	/** Shows the player's pace at the shown boss, or hides the row before their first kill. */
+	private void showPace()
+	{
+		if (paceRow == null || shown == null || shown.getBoss() == null)
+		{
+			return;
+		}
+		KillPace pace = paces.get(shown.getBoss().getId());
+		paceRow.setVisible(pace != null && pace.getKills() > 0);
+		if (pace == null || pace.getKills() == 0)
+		{
+			return;
+		}
+		String kills = Html.keep(pace.getKills() + (pace.getKills() == 1 ? " kill" : " kills") + " this session");
+		if (pace.getKph() <= 0)
+		{
+			paceValue.setText(kills);
+			return;
+		}
+		String text = Html.color(Html.GOLD, Html.keep(String.format(Locale.ROOT, "%.1f kills/hr", pace.getKph()))) + " " + Html.muted("(" + kills + ")");
+		Profit profit = shown.getProfit();
+		if (profit != null && profit.getKph() > 0)
+		{
+			// the guide's gp an hour, at the player's own pace
+			long gp = Math.round(profit.getGpPerHour() * pace.getKph() / profit.getKph());
+			text += "<br>" + Html.keep("about " + Format.gp(gp) + "/hr");
+		}
+		paceValue.setText(text);
+		Components.refresh(paceRow);
 	}
 
 	private static String signed(String text, boolean up)

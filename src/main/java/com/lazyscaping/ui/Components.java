@@ -88,13 +88,25 @@ final class Components
 	/** A short muted label with a value beside it, which wraps under itself rather than under the label. */
 	static JComponent fact(String label, String html)
 	{
+		return fact(label, factValue(html));
+	}
+
+	/** A fact whose value label can be changed later, made with {@link #factValue}. */
+	static JComponent fact(String label, JLabel value)
+	{
 		JPanel row = new JPanel(new BorderLayout(4, 0));
 		row.setOpaque(false);
 		JLabel name = rowLabel(label, Html.MUTED);
 		name.setVerticalAlignment(SwingConstants.TOP);
 		row.add(name, BorderLayout.WEST);
-		row.add(label(html, FACT_WIDTH), BorderLayout.CENTER);
+		row.add(value, BorderLayout.CENTER);
 		return spaced(row, 3);
+	}
+
+	/** The value label of a fact, wrapped to fit beside its name. */
+	static JLabel factValue(String html)
+	{
+		return label(html, FACT_WIDTH);
 	}
 
 	private static JLabel rowLabel(String text, Color color)

@@ -23,7 +23,7 @@ The side panel has three tabs.
 - **Solo or group.** Bosses with solo and group builds, like the raids, Nex and the God Wars generals, have a *Team* picker. The choice is saved per boss.
 - **Equipment stats.** The worn gear's total bonuses, laid out like the in-game equipment stats screen, with the ones that matter for your style in gold.
 - **Try upgrades.** Click *Try upgrade* under any slot to see the setup as if you had the next item, switches and inventory included. *Undo* drops one, and *Back to my gear* drops them all. The overview shows what they add in kills and gp an hour.
-- **Pace and profit.** For bosses with a wiki money making guide, the overview estimates your kills and gp an hour at the pace your gear and levels allow.
+- **Pace and profit.** For bosses with a wiki money making guide, the overview estimates your kills and gp an hour at the pace your gear and levels allow. Once you start killing the boss, a *You* row shows your real kills an hour this session, from your kill count messages, and the gp an hour at your pace.
 - **Best upgrades.** The upgrades that do the most for their price, one per slot, with the gp an hour each adds and how it changes the stats that matter for your style.
 - **Fight tips.** Click *Fight tips* for the fight's tips, which spellbook to be on and whether to use thralls. The *Style* picker marks the style your gear suits best.
 - **Easy to scan.** Each section folds away by clicking its heading, and stays how you left it. Click any item's picture for its wiki page, and hover a stat for what it does.

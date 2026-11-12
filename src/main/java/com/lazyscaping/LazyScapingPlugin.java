@@ -35,6 +35,7 @@ import javax.inject.Inject;
 import javax.swing.SwingUtilities;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
+import net.runelite.api.events.ChatMessage;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.ItemContainerChanged;
@@ -134,6 +135,8 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 	@Inject
 	private SetupExporter setupExporter;
 
+	private final KillTracker killTracker = new KillTracker((bossId, pace) -> updatePanel(p -> p.setKillPace(bossId, pace)));
+
 	@Inject
 	private HouseReader houseReader;
 
@@ -197,6 +200,7 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 		panel = new LazyScapingPanel(this, iconLoader);
 		panel.setLiveEnabled(config.liveRecommendations());
 		panel.setBossOptions(catalog.getBosses(), catalog.getBossGroups());
+		killTracker.setBosses(catalog.getBosses());
 		panel.setTaskOptions(catalog.getSlayerTasks());
 
 		navButton = NavigationButton.builder()
@@ -246,6 +250,7 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 		{
 			playerName = null;
 			slayerTaskName = null;
+			killTracker.reset();
 			updatePanel(p -> p.setLoggedIn(false));
 		}
 	}
@@ -370,6 +375,12 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 			// the bank's items load after its interface
 			clientThread.invokeLater(bankTagLoader::onBankOpened);
 		}
+	}
+
+	@Subscribe
+	public void onChatMessage(ChatMessage event)
+	{
+		killTracker.onChatMessage(event);
 	}
 
 	@Subscribe
@@ -1078,6 +1089,7 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 			if (!updated.getBosses().isEmpty())
 			{
 				updatePanel(p -> p.setBossOptions(updated.getBosses(), updated.getBossGroups()));
+				clientThread.invoke(() -> killTracker.setBosses(updated.getBosses()));
 			}
 			if (!updated.getSlayerTasks().isEmpty())
 			{

@@ -170,6 +170,12 @@ public class LazyScapingPanel extends PluginPanel
 		setup(GearTarget.SLAYER).setPathAvailable(available);
 	}
 
+	/** The player's real pace at a boss this session, shown with that boss's setup. */
+	public void setKillPace(String bossId, KillPace pace)
+	{
+		setup(GearTarget.BOSS).setKillPace(bossId, pace);
+	}
+
 	public void setCoins(long coins)
 	{
 		training.setCoins(coins);
