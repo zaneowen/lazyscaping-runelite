@@ -13,6 +13,7 @@ Found a bug or have an idea? [Open an issue](https://github.com/zaneowen/lazysca
 The side panel has three tabs.
 
 **Training**
+- **What to do next.** The top of the Training tab suggests your next steps across the account: bosses you're ready for, levels that get you to bosses you're close to, untradeable gear worth earning and quests that open faster training. Click a boss to open it in the Bossing tab, or a level to set it as your goal.
 - **Training goal.** Pick a skill and a target level. The panel shows your progress since you set the goal, xp left, and, while you're training, your xp/hr and how long the goal will take (from RuneLite's XP Tracker).
 - **Your plan.** The LazyScaping plan for your goal: which method to use at each level, with xp/hr, hours and cost, following your *Plan priority* setting and your budget. Click a step for the method's guide and materials.
 - **Training methods.** Every method for the skill, with what it needs. Click one for its details and guide, and *Use this method* to plan around it.
@@ -56,6 +57,7 @@ All requests go to `https://lazyscaping.app` and are made in the background, nev
 | `GET /api/plugin/v1/catalog` | When the plugin starts with *Live recommendations* on, or when you turn it on | Nothing. It fetches the site's gear names, bosses and Slayer tasks, so new gear is recognised without a plugin update. |
 | `POST /api/plugin/v1/plan` | When you log in, change your goal, method, *Plan priority* or training budget, gain a level, or click *Refresh* | Goal skill, its xp and target level; all skill levels; members and ironman flags; quest unlocks that open training methods; plan priority; training budget in gp; picked method. |
 | `POST /api/plugin/v1/gear` | When you log in, pick a boss, Slayer task, team size or style, try or undo an upgrade, change your gear budget or house settings, get or lose gear (at most once a minute), or click *Refresh* | The boss or task, team size and style; all skill levels; LazyScaping ids of the gear you own, and of any upgrades you're trying; members and ironman flags; gear budget in gp; whether the elite Lumbridge Diary is done; the house teleports in your settings. |
+| `POST /api/plugin/v1/next` | With the gear setups: when you log in, click *Refresh*, gain a level or get new gear (at most once a minute) | All skill levels; LazyScaping ids of the gear you own; members and ironman flags; quest unlocks. |
 | `GET` item pictures | When a setup shows an untradeable item | Nothing. Pictures of tradeable items come from RuneLite. |
 
 The *Open my planner on lazyscaping.app* button is separate: it opens a link in your browser with your name, account type, goal, gear and quest unlocks after the `#`, which browsers don't send to the server. It works with *Live recommendations* off.

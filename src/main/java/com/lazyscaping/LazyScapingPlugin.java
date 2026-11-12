@@ -132,6 +132,11 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 	// Client thread state
 	private String playerName;
 	private boolean loadPending;
+	/** Levels or gear changed, so what to do next needs fetching again. */
+	private boolean nextStepsStale;
+	private int nextStepsFetchTick = -GearPlan.REFRESH_TICKS;
+	/** The owned gear what to do next was fetched with. */
+	private Set<String> nextStepsGear = Set.of();
 	/** A house setting changed, so the gear setups need fetching again. */
 	private volatile boolean houseChanged;
 	private int tickCount;
@@ -263,6 +268,10 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 				fetchGearSetup(plan);
 			}
 		}
+		if (nextStepsStale && tickCount - nextStepsFetchTick >= GearPlan.REFRESH_TICKS)
+		{
+			fetchNextSteps();
+		}
 	}
 
 	@Subscribe
@@ -277,6 +286,7 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 		if (previous != null && previous != event.getLevel())
 		{
 			gearPlans.values().forEach(plan -> plan.stale = true);
+			nextStepsStale = true;
 		}
 		if (event.getSkill() == goalSkill)
 		{
@@ -325,6 +335,7 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 					plan.stale = true;
 				}
 			}
+			nextStepsStale |= !owned.equals(nextStepsGear);
 		}
 	}
 
@@ -360,6 +371,7 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 					planLevel = -1;
 					fetchPlan();
 					fetchGearSetups();
+					fetchNextSteps();
 				});
 				break;
 			case "priority":
@@ -592,6 +604,7 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 			updateProgress();
 			fetchPlan();
 			fetchGearSetups();
+			fetchNextSteps();
 		});
 	}
 
@@ -689,6 +702,7 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 		updateSlayerTask();
 		fetchPlan();
 		fetchGearSetups();
+		fetchNextSteps();
 	}
 
 	/** The team size saved for a boss, or null for its usual one. */
@@ -782,6 +796,20 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 		return Strings.isNullOrEmpty(location) ? "" : ", in " + location;
 	}
 
+	/** The ids of the quest unlocks the player has done, as the site names them. */
+	private JsonArray questUnlocks()
+	{
+		JsonArray unlocks = new JsonArray();
+		account.questUnlocks().forEach((id, done) ->
+		{
+			if (done)
+			{
+				unlocks.add(id);
+			}
+		});
+		return unlocks;
+	}
+
 	private void fetchPlan()
 	{
 		if (goalSkill == null)
@@ -795,14 +823,7 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 		}
 
 		planLevel = account.level(goalSkill);
-		JsonArray unlocks = new JsonArray();
-		account.questUnlocks().forEach((id, done) ->
-		{
-			if (done)
-			{
-				unlocks.add(id);
-			}
-		});
+		JsonArray unlocks = questUnlocks();
 
 		JsonObject body = new JsonObject();
 		body.addProperty("skill", goalSkill.getName());
@@ -821,6 +842,27 @@ public class LazyScapingPlugin extends Plugin implements PanelActions
 
 		updatePanel(p -> p.showPlanMessage("Loading your plan..."));
 		api.plan(body, plan -> updatePanel(p -> p.showPlan(plan)), error -> updatePanel(p -> p.showPlanError(error)));
+	}
+
+	/** What to do next across the account, from the player's levels, gear and quests. */
+	private void fetchNextSteps()
+	{
+		nextStepsStale = false;
+		if (playerName == null || !config.liveRecommendations())
+		{
+			return;
+		}
+		nextStepsFetchTick = tickCount;
+		nextStepsGear = ownedItems.gear(catalog);
+
+		JsonObject body = new JsonObject();
+		body.add("levels", account.levels());
+		body.add("owned", gson.toJsonTree(nextStepsGear));
+		body.addProperty("members", account.isMember());
+		body.addProperty("ironman", account.isIronman());
+		body.add("unlocks", questUnlocks());
+		// not worth an error in the panel: the card just stays as it was
+		api.nextSteps(body, steps -> updatePanel(p -> p.showNextSteps(steps)), error -> log.debug("Couldn't fetch next steps: {}", error));
 	}
 
 	private void fetchGearSetups()

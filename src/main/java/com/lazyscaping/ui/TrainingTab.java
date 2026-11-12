@@ -42,7 +42,7 @@ class TrainingTab extends JPanel
 	private Skill skill;
 	private boolean updating;
 
-	TrainingTab(PanelActions actions, IconLoader icons)
+	TrainingTab(PanelActions actions, IconLoader icons, NextStepsView nextSteps)
 	{
 		super(new BorderLayout());
 		this.actions = actions;
@@ -51,6 +51,8 @@ class TrainingTab extends JPanel
 		budget = new BudgetPicker(Budget.TRAINING_PRESETS, "Gp to spend on training methods", b -> actions.budgetChanged(false, b));
 
 		JPanel content = Components.column();
+		content.add(nextSteps.getComponent());
+		content.add(Components.gap(8));
 		content.add(buildGoalCard());
 		content.add(Components.gap(8));
 

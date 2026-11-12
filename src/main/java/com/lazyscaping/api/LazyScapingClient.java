@@ -60,6 +60,11 @@ public class LazyScapingClient
 		send(post(API + "plan", body), Plan.class, onSuccess, onError);
 	}
 
+	public void nextSteps(JsonObject body, Consumer<NextSteps> onSuccess, Consumer<String> onError)
+	{
+		send(post(API + "next", body), NextSteps.class, onSuccess, onError);
+	}
+
 	public void gearSetup(JsonObject body, Consumer<GearSetup> onSuccess, Consumer<String> onError)
 	{
 		send(post(API + "gear", body), GearSetup.class, onSuccess, onError);

@@ -2,6 +2,7 @@ package com.lazyscaping.ui;
 
 import com.lazyscaping.api.Boss;
 import com.lazyscaping.api.GearSetup;
+import com.lazyscaping.api.NextSteps;
 import com.lazyscaping.api.Plan;
 import com.lazyscaping.api.SlayerTaskRef;
 import java.awt.BorderLayout;
@@ -28,12 +29,18 @@ public class LazyScapingPanel extends PluginPanel
 	private final SlayerTab slayer;
 	private final JLabel status = Components.label("");
 	private final JPanel liveNotice = Components.card("Live recommendations");
+	private final PanelActions actions;
+	private final NextStepsView nextSteps;
+	private MaterialTabGroup tabs;
+	private MaterialTab bossingTab;
 
 	public LazyScapingPanel(PanelActions actions, IconLoader icons)
 	{
 		setBorder(new EmptyBorder(10, 10, 10, 10));
 		setLayout(new BorderLayout());
-		training = new TrainingTab(actions, icons);
+		this.actions = actions;
+		nextSteps = new NextStepsView(this::openBoss, this::setGoalFromStep);
+		training = new TrainingTab(actions, icons, nextSteps);
 		bossing = new BossingTab(actions, icons);
 		slayer = new SlayerTab(actions, icons);
 
@@ -59,12 +66,13 @@ public class LazyScapingPanel extends PluginPanel
 		sync.addActionListener(e -> actions.openPlanner());
 
 		JPanel display = new JPanel(new BorderLayout());
-		MaterialTabGroup tabs = new MaterialTabGroup(display);
+		tabs = new MaterialTabGroup(display);
 		tabs.setLayout(new GridLayout(1, 3, 2, 0));
 		tabs.setBorder(new EmptyBorder(0, 0, 8, 0));
 		MaterialTab trainingTab = tab("Training", tabs, training);
 		tabs.addTab(trainingTab);
-		tabs.addTab(tab("Bossing", tabs, bossing));
+		bossingTab = tab("Bossing", tabs, bossing);
+		tabs.addTab(bossingTab);
 		tabs.addTab(tab("Slayer", tabs, slayer));
 		tabs.select(trainingTab);
 
@@ -81,6 +89,21 @@ public class LazyScapingPanel extends PluginPanel
 		add(content, BorderLayout.NORTH);
 
 		setLoggedIn(false);
+	}
+
+	/** Opens a boss in the Bossing tab, as if it were picked there. */
+	private void openBoss(String bossId)
+	{
+		bossing.selectBoss(bossId);
+		actions.bossSelected(bossId);
+		tabs.select(bossingTab);
+	}
+
+	/** Sets a level from a next step as the training goal. */
+	private void setGoalFromStep(Skill skill, int level)
+	{
+		training.setGoal(skill, level);
+		actions.goalChanged(skill, level);
 	}
 
 	private static MaterialTab tab(String name, MaterialTabGroup group, JPanel content)
@@ -102,6 +125,7 @@ public class LazyScapingPanel extends PluginPanel
 			bossing.getSetupView().showMessage(null);
 			slayer.showMessage(null);
 			slayer.setCurrentTask(null);
+			nextSteps.show(null);
 		}
 	}
 
@@ -113,6 +137,7 @@ public class LazyScapingPanel extends PluginPanel
 			training.showPlanMessage("Needs Live recommendations.");
 			bossing.getSetupView().showMessage("Needs Live recommendations.");
 			slayer.showMessage("Needs Live recommendations.");
+			nextSteps.show(null);
 		}
 	}
 
@@ -173,6 +198,12 @@ public class LazyScapingPanel extends PluginPanel
 	public void showProgress(GoalProgress progress)
 	{
 		training.showProgress(progress);
+	}
+
+	/** Shows what to do next, or hides it when null. */
+	public void showNextSteps(NextSteps steps)
+	{
+		nextSteps.show(steps);
 	}
 
 	public void showPlan(Plan plan)
