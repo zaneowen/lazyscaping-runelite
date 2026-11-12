@@ -22,6 +22,8 @@ public class SlayerTask
 	private List<String> tips = Collections.emptyList();
 	/** Advice for skipping or blocking it. */
 	private String skip;
+	/** The wiki's advice on doing, skipping or blocking it, or null. */
+	private SlayerAdvice advice;
 	/** A boss that counts towards the task. */
 	private String boss;
 }

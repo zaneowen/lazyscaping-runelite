@@ -30,7 +30,7 @@ The side panel has three tabs.
 - **Easy to scan.** Each section folds away by clicking its heading, and stays how you left it. Click any item's picture for its wiki page, and hover a stat for what it does.
 
 **Slayer**
-- **Your task.** The task from RuneLite's Slayer plugin, with kills left, is picked automatically; you can also pick any task. It shows the requirements, where to kill them and tips.
+- **Your task.** The task from RuneLite's Slayer plugin, with kills left, is picked automatically; you can also pick any task. It shows whether to do, skip or block it and its xp an hour (from the OSRS Wiki's Slayer training guide), the requirements, where to kill them and tips.
 - **Gear for the task.** The same gear setup as the Bossing tab, planned for the task. *Plan with my Slayer helmet (i)* is ticked when you own one (any colour), and you can tick it yourself if yours is somewhere the plugin can't see.
 
 **Show setup in bank.** Every gear setup can open a temporary *lazyscaping* bank tag with its items, laid out with the worn gear on top and the inventory as it's packed. If your bank is closed, it opens next time you open it. *Copy for Inventory Setups* copies the setup to paste into the [Inventory Setups](https://runelite.net/plugin-hub/show/inventory-setups) plugin's *Import setup*, gear, inventory, rune pouch and bank layout included. *Copy a link to share* copies a link to the setup on lazyscaping.app, with its style, your gear and your levels, to send to a friend or clan.

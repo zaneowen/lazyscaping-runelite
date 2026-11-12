@@ -1,6 +1,7 @@
 package com.lazyscaping.ui;
 
 import com.lazyscaping.api.GearSetup;
+import com.lazyscaping.api.SlayerAdvice;
 import com.lazyscaping.api.SlayerSpot;
 import com.lazyscaping.api.SlayerTask;
 import com.lazyscaping.api.SlayerTaskRef;
@@ -8,11 +9,13 @@ import java.awt.BorderLayout;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
+import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import net.runelite.client.ui.ColorScheme;
@@ -149,11 +152,31 @@ class SlayerTab extends JPanel
 		taskInfo.removeAll();
 		if (task != null)
 		{
+			addAdvice(task.getAdvice());
 			addRequirements(task);
 			addSpots(task);
 			addMore(task);
 		}
 		Components.refresh(taskInfo);
+	}
+
+	/** Whether to do, skip or block the task, and its xp an hour, as the wiki advises. */
+	private void addAdvice(SlayerAdvice advice)
+	{
+		if (advice == null || advice.getVerdict() == null)
+		{
+			return;
+		}
+		taskInfo.add(Components.gap(4));
+		boolean doIt = advice.getVerdict().toLowerCase(Locale.ROOT).matches("do\\b.*");
+		JComponent verdict = Components.fact("Verdict", Html.color(doIt ? Html.GREEN : Html.GOLD, Html.escape(advice.getVerdict())));
+		verdict.setToolTipText("Whether to do, skip or block it, from the OSRS Wiki's Slayer training guide");
+		taskInfo.add(verdict);
+		if (advice.getXpHr() != null)
+		{
+			// one line per style, like "80,000 (Magic) / 40,000 (Melee)"
+			taskInfo.add(Components.fact("Xp/hr", Html.escape(advice.getXpHr()).replace(" / ", "<br>")));
+		}
 	}
 
 	private void addRequirements(SlayerTask task)
